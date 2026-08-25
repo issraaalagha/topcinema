@@ -109,6 +109,31 @@
   }
 </script>
 
+<!-- Search Bar & Filters (At Top) -->
+<div class="home-toolbar">
+  <div class="search-wrap">
+    <div class="search-input-box">
+      <svg class="search-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+        <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 14z"/>
+      </svg>
+      <input
+        type="search"
+        placeholder="ابحث عن فيلم، مسلسل، ممثل، أو تصنيف…"
+        bind:value={q}
+        oninput={onSearch}
+        autocomplete="off"
+      />
+      {#if q}
+        <button type="button" class="clear-btn" onclick={clearSearch} aria-label="مسح البحث">✕</button>
+      {/if}
+    </div>
+  </div>
+
+  {#if !results && initialTab !== 'watchlist'}
+    <CategoryChips selected={selectedCategory} onSelect={handleCategorySelect} />
+  {/if}
+</div>
+
 {#if initialTab === 'watchlist'}
   <!-- Watchlist View with Categorized Filter -->
   <section class="watchlist-section">
@@ -159,7 +184,7 @@
   </section>
 {:else if loading}
   <!-- Shimmer Skeleton Loaders -->
-  <SkeletonHero />
+  <SkeletonRow />
   <SkeletonRow />
   <SkeletonRow />
 {:else if error}
@@ -172,69 +197,37 @@
       إعادة المحاولة
     </button>
   </div>
-{:else}
-  <!-- Top Hero Spotlight (First Impression) -->
-  {#if heroItem && !selectedCategory && !results}
-    <Hero item={heroItem} />
-  {/if}
-
-  <!-- Search Bar & Filters (Directly Under Hero) -->
-  <div class="home-toolbar">
-    <div class="search-wrap">
-      <div class="search-input-box">
-        <svg class="search-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 14z"/>
-        </svg>
-        <input
-          type="search"
-          placeholder="ابحث عن فيلم، مسلسل، ممثل، أو تصنيف…"
-          bind:value={q}
-          oninput={onSearch}
-          autocomplete="off"
-        />
-        {#if q}
-          <button type="button" class="clear-btn" onclick={clearSearch} aria-label="مسح البحث">✕</button>
-        {/if}
+{:else if results}
+  <!-- Search Results Grid / Row -->
+  <section class="results-section">
+    <Row title={`نتائج البحث عن "${q}" (${results.length})`} items={results} />
+    {#if results.length === 0}
+      <div class="empty-state">
+        <span class="empty-icon">🔍</span>
+        <h3>لا توجد نتائج مطابقة</h3>
+        <p>جرّب البحث بكلمات مختلفة أو تصفح الأقسام والتصنيفات الأخرى.</p>
       </div>
-    </div>
-
-    {#if !results}
-      <CategoryChips selected={selectedCategory} onSelect={handleCategorySelect} />
     {/if}
-  </div>
-
-  {#if results}
-    <!-- Search Results Grid / Row -->
-    <section class="results-section">
-      <Row title={`نتائج البحث عن "${q}" (${results.length})`} items={results} />
-      {#if results.length === 0}
-        <div class="empty-state">
-          <span class="empty-icon">🔍</span>
-          <h3>لا توجد نتائج مطابقة</h3>
-          <p>جرّب البحث بكلمات مختلفة أو تصفح الأقسام والتصنيفات الأخرى.</p>
-        </div>
-      {/if}
-    </section>
-  {:else}
-    <!-- Continue Watching Section -->
-    {#if continueWatching.length > 0}
-      <Row
-        title="متابعة المشاهدة ⏱️"
-        items={continueWatching}
-        isContinueWatching={true}
-      />
-    {/if}
-
-    <!-- Personalized AI Recommendations Row -->
-    {#if recommendations?.items?.length && !selectedCategory}
-      <Row title={recommendations.title} items={recommendations.items} />
-    {/if}
-
-    <!-- Categorized Rows -->
-    {#each rows as row, idx (`${row.id || ''}_${idx}`)}
-      <Row title={row.title} items={row.items} />
-    {/each}
+  </section>
+{:else}
+  <!-- Continue Watching Section -->
+  {#if continueWatching.length > 0}
+    <Row
+      title="متابعة المشاهدة ⏱️"
+      items={continueWatching}
+      isContinueWatching={true}
+    />
   {/if}
+
+  <!-- Personalized AI Recommendations Row -->
+  {#if recommendations?.items?.length && !selectedCategory}
+    <Row title={recommendations.title} items={recommendations.items} />
+  {/if}
+
+  <!-- Categorized Rows -->
+  {#each rows as row, idx (`${row.id || ''}_${idx}`)}
+    <Row title={row.title} items={row.items} />
+  {/each}
 {/if}
 
 <style>
