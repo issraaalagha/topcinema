@@ -14,8 +14,6 @@
   let resolveError = $state('');
   let inList = $state(false);
   let copied = $state(false);
-  let extractionStrategy = $state('direct'); // 'direct' or 'iframe'
-  let requiresAdBlock = $state(false);
 
   function syncWatchlistStatus() {
     if (id) inList = isInWatchlist(id);
@@ -40,12 +38,16 @@
       api
         .post(currentId)
         .then((d) => {
+          // VIP Filtering: Strictly remove servers that enforce CORS/Proxy blocks. (NO IFRAME FALLBACK ALLOWED)
+          if (d.servers) {
+            d.servers = d.servers.filter(s => !/streamwish|filelions|dood|streamtape|lulu/i.test(s.name));
+          }
+          
           data = d;
           syncWatchlistStatus();
-          // Priority: high-speed direct native servers first (UpDown, StreamWish, FileLions, VideoTube)
-          const preferred =
-            d.servers?.find((s) => /updown|streamwish|filelions|videotube/i.test(s.name)) ||
-            d.servers?.[0];
+          
+          // Auto-pick the first available VIP server (VideoTube, UpDown, Mixdrop, etc.)
+          const preferred = d.servers?.[0];
           if (preferred) pick(preferred);
         })
         .catch((e) => (error = e.message));
@@ -57,8 +59,6 @@
     stream = null;
     resolveError = '';
     resolving = true;
-    extractionStrategy = 'direct';
-    requiresAdBlock = false;
 
     try {
       const r = await api.resolve(id, srv.server);
@@ -77,9 +77,6 @@
         server: srv.name
       };
       
-      extractionStrategy = 'direct';
-      requiresAdBlock = false;
-
     } catch (e) {
       console.error('[Watch] Error:', e);
       resolveError = 'فشل معالجة رابط السيرفر: ' + e.message;
@@ -132,7 +129,11 @@
     <div class="player-col">
       <!-- Native HTML5 / HLS Player Shell -->
       <div class="player-wrapper">
-        {#if resolving}
+        {#if data.servers?.length === 0}
+          <div class="player-shell error-msg">
+            <p>لا توجد سيرفرات VIP متاحة لهذا العمل حالياً.</p>
+          </div>
+        {:else if resolving}
           <div class="player-shell loading">
             <div class="loader small"></div>
             <p>جارٍ تحليل السيرفر وفك تشفير البث المباشر… ⚡</p>
@@ -143,8 +144,7 @@
             title={data.post.title}
             poster={data.post.poster}
             type={stream.type}
-            strategy={extractionStrategy}
-            requiresAdBlock={requiresAdBlock}
+            strategy="direct"
             onError={(err) => {
               console.error('[Player] Error:', err);
               resolveError = 'فشل تشغيل الفيديو. جرب سيرفر آخر.';

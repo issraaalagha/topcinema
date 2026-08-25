@@ -1,7 +1,7 @@
 # 🎬 TopCinema Enhanced Video Player System
-## Enterprise-Grade Hybrid Streaming Architecture
+## VIP Pure Native Streaming Architecture (No Iframes Allowed)
 
-> **Version:** 2.0.0  
+> **Version:** 3.0.0 (VIP Core)  
 > **Date:** August 2026  
 > **Status:** ✅ Production Ready
 
@@ -9,13 +9,14 @@
 
 ## 📋 Executive Summary
 
-نظام تشغيل فيديو هجين متقدم يجمع بين **Direct URL Extraction** و **Smart Iframe Fallback** مع دعم **Chromecast** وحظر الإعلانات التلقائي.
+نظام تشغيل فيديو أصلي نقي 100% (Pure Native HLS/MP4) يرتكز حصرياً على **Direct URL Extraction**. 
+**قرار معماري قطعي:** يُمنع منعاً باتاً استخدام تقنية الـ Iframe Fallback. السيرفرات التي لا تدعم المشغل النقي يتم استبعادها من الواجهة للحفاظ على تجربة خالية من الإعلانات تماماً.
 
 ### ✨ Key Features
 
-- ✅ **Direct HLS/MP4 Extraction** - استخراج روابط مباشرة من سيرفرات VidTube, LuluStream, StreamWish
-- ✅ **Smart Fallback System** - تبديل تلقائي إلى iframe عند فشل الاستخراج المباشر
-- ✅ **Ad-Blocking Service Worker** - حظر إعلانات مدمج للـ iframe embeds
+- ✅ **Strict VIP Extraction** - استخراج روابط M3U8/MP4 نقية عبر API (VideoTube, UpDown, Mixdrop)
+- 🚫 **NO Iframe Fallbacks** - لا يوجد تراجع لنظام الإطارات المضمنة (Iframes) تحت أي ظرف
+- ✅ **100% Ad-Free Guarantee** - صفر إعلانات ونوافذ منبثقة لأن البث مباشر
 - ✅ **Chromecast Support** - بث مباشر إلى Google Chromecast/Android TV
 - ✅ **HLS.js Integration** - دعم HTTP Live Streaming على جميع المتصفحات
 - ✅ **Adaptive Quality** - جودة تكيفية حسب سرعة الإنترنت
@@ -29,33 +30,32 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Watch.svelte                         │
-│  (User Interface + Orchestration)                       │
+│  (VIP Server Filtering + Orchestration)                 │
 └────────────────┬────────────────────────────────────────┘
                  │
                  ▼
 ┌─────────────────────────────────────────────────────────┐
-│              VideoExtractorService                      │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  Strategy Selection:                             │  │
-│  │  1. VidTube Extractor                            │  │
-│  │  2. LuluStream Extractor                         │  │
-│  │  3. StreamWish Extractor                         │  │
-│  │  4. Generic Fallback Extractor                   │  │
-│  └──────────────────────────────────────────────────┘  │
+│            /api/resolve/[id]/[server]                   │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │  Pure Direct Extraction:                         │   │
+│  │  • Fetch Embed HTML (Server Side)                │   │
+│  │  • Regex / JS Unpacking                          │   │
+│  │  • Return Direct .m3u8 or .mp4                   │   │
+│  └──────────────────────────────────────────────────┘   │
 └────────────────┬────────────────────────────────────────┘
                  │
                  ├──── Success (Direct URL) ───►
                  │
-                 └──── Failure ───► Fallback to iframe
+                 └──── Failure ───► Error Message (No Iframe)
                  
                  ▼
 ┌─────────────────────────────────────────────────────────┐
 │              EnhancedPlayer.svelte                      │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  Rendering Strategy:                             │  │
-│  │  • Direct: HTML5 <video> + HLS.js                │  │
-│  │  • Iframe: <iframe> with ad-blocking             │  │
-│  └──────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │  Rendering Strategy:                             │   │
+│  │  • ALWAYS Direct: HTML5 <video> + HLS.js         │   │
+│  └──────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
 │  ┌──────────────────────────────────────────────────┐  │
 │  │  ChromecastManager (optional)                    │  │
 │  │  • Device discovery                              │  │
