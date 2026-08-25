@@ -122,11 +122,19 @@
 
     // Video event listeners
     videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+    videoElement.addEventListener('canplay', () => { loading = false; });
+    videoElement.addEventListener('playing', () => { loading = false; isPlaying = true; });
+    videoElement.addEventListener('waiting', () => { loading = true; });
     videoElement.addEventListener('timeupdate', handleTimeUpdate);
     videoElement.addEventListener('play', () => isPlaying = true);
     videoElement.addEventListener('pause', () => isPlaying = false);
     videoElement.addEventListener('volumechange', handleVolumeChange);
     videoElement.addEventListener('error', handleVideoError);
+
+    // Attempt autoplay if allowed by browser
+    videoElement.play().catch(() => {
+      // Expected if autoplay policy requires user gesture
+    });
   }
 
   function detectType(url) {
@@ -321,6 +329,14 @@
       onclick={togglePlay}
     ></video>
 
+    {#if !isPlaying && !loading && !error}
+      <button class="big-play-btn" onclick={togglePlay} aria-label="تشغيل">
+        <svg viewBox="0 0 24 24" width="38" height="38" fill="currentColor">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+      </button>
+    {/if}
+
     {#if loading}
       <div class="player-loading">
         <div class="spinner"></div>
@@ -366,7 +382,7 @@
         </button>
 
         <!-- Time -->
-        <span class="time-display">
+        <span class="time-display" dir="ltr">
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
 
@@ -465,6 +481,38 @@
     height: 100%;
     object-fit: contain;
     cursor: pointer;
+  }
+
+  .big-play-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: rgba(229, 9, 20, 0.95);
+    border: 2.5px solid rgba(255, 255, 255, 0.9);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(229, 9, 20, 0.6), 0 0 20px rgba(255, 255, 255, 0.2);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s, box-shadow 0.25s;
+    z-index: 15;
+    padding: 0;
+    padding-right: 3px;
+  }
+
+  .big-play-btn:hover {
+    transform: translate(-50%, -50%) scale(1.18);
+    background: #ff0f1f;
+    box-shadow: 0 12px 40px rgba(255, 15, 31, 0.8), 0 0 30px rgba(255, 255, 255, 0.4);
+  }
+
+  .big-play-btn:active {
+    transform: translate(-50%, -50%) scale(0.95);
   }
 
   .player-loading,
