@@ -37,27 +37,10 @@
   });
 
   $effect(() => {
-    // Check auth on load
-    api
-      .verifyAuth()
-      .then((res) => {
-        isAuthenticated = !!res.authenticated;
-        if (isAuthenticated) syncFromCloud();
-      })
-      .catch(() => {
-        // if offline or error, maintain token state
-        isAuthenticated = !!getAuthToken();
-      })
-      .finally(() => {
-        checkingAuth = false;
-      });
-
-    const handleUnauthorized = () => {
-      isAuthenticated = false;
-    };
-
-    window.addEventListener('topcinema-unauthorized', handleUnauthorized);
-    return () => window.removeEventListener('topcinema-unauthorized', handleUnauthorized);
+    // Temporary bypass: Always authenticated for open testing
+    isAuthenticated = true;
+    checkingAuth = false;
+    syncFromCloud();
   });
 
   $effect(() => {
@@ -122,11 +105,6 @@
 </script>
 
 <svelte:window onclick={handleLinkClick} />
-
-{#if !isAuthenticated && !checkingAuth}
-  <!-- Master Passcode Security Gate -->
-  <PasscodeGate onAuthenticated={handleAuthenticated} />
-{/if}
 
 <header class="topbar {isScrolled ? 'scrolled' : ''}">
   <div class="topbar-inner">
