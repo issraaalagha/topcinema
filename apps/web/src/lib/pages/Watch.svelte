@@ -46,8 +46,10 @@
           data = d;
           syncWatchlistStatus();
           
-          // Auto-pick the first available VIP server (VideoTube, UpDown, Mixdrop, etc.)
-          const preferred = d.servers?.[0];
+          // Auto-pick the highest-speed VIP server (UpDown first, then others)
+          const preferred =
+            d.servers?.find((s) => /updown/i.test(s.name)) ||
+            d.servers?.[0];
           if (preferred) pick(preferred);
         })
         .catch((e) => (error = e.message));
