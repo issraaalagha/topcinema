@@ -4,7 +4,7 @@
    * Enterprise-grade player with HLS/MP4 support, quality switching, and casting
    * @component EnhancedPlayer
    */
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import { castManager } from '../services/castManager.js';
   import Hls from 'hls.js';
 
@@ -43,9 +43,13 @@
   let currentQuality = $state(-1); // -1 = auto
 
   $effect(() => {
-    if (src && videoElement && strategy === 'direct') {
-      cleanup();
-      initializeDirectPlayer();
+    const currentSrc = src;
+    const currentStrat = strategy;
+    if (currentSrc && videoElement && currentStrat === 'direct') {
+      untrack(() => {
+        cleanup();
+        initializeDirectPlayer();
+      });
     }
   });
 

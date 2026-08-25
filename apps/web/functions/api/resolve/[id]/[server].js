@@ -166,12 +166,13 @@ export async function onRequest(context) {
     }
 
     if (directStreamUrl) {
-      const proxiedUrl = `/api/proxy?url=${encodeURIComponent(directStreamUrl)}&ref=${encodeURIComponent(embedOrigin)}`;
+      const cleanStreamUrl = directStreamUrl.replace(/&asn=\d+/g, '');
+      const proxiedUrl = `/api/proxy?url=${encodeURIComponent(cleanStreamUrl)}&ref=${encodeURIComponent(embedOrigin)}`;
       return jsonResponse({
         ok: true,
         url: proxiedUrl,
-        direct: directStreamUrl,
-        type: directStreamUrl.includes('.mp4') ? 'mp4' : 'hls',
+        direct: cleanStreamUrl,
+        type: cleanStreamUrl.includes('.mp4') ? 'mp4' : 'hls',
       }, 200, 600);
     }
 

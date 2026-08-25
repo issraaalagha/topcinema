@@ -56,9 +56,11 @@ export async function onRequest(context) {
     fetchHeaders.set('Range', range);
   }
 
+  let cleanTargetUrl = targetUrl.replace(/&asn=\d+/g, '');
+
   let upstreamResponse;
   try {
-    upstreamResponse = await fetch(targetUrl, {
+    upstreamResponse = await fetch(cleanTargetUrl, {
       method: request.method === 'HEAD' ? 'HEAD' : 'GET',
       headers: fetchHeaders,
       redirect: 'follow',

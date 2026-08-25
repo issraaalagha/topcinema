@@ -1,8 +1,8 @@
 <script>
+  import { untrack } from 'svelte';
   import { api } from '../api.js';
   import EnhancedPlayer from '../player/EnhancedPlayer.svelte';
   import { isInWatchlist, toggleWatchlist } from '../store.js';
-  import { videoExtractor } from '../services/videoExtractor.js';
 
   let { id } = $props();
 
@@ -28,23 +28,28 @@
   });
 
   $effect(() => {
-    data = null;
-    error = '';
-    stream = null;
-    resolveError = '';
+    const currentId = id;
+    if (!currentId) return;
 
-    api
-      .post(id)
-      .then((d) => {
-        data = d;
-        syncWatchlistStatus();
-        // Priority: high-speed direct native servers first (UpDown, StreamWish, FileLions, Mixdrop, VideoTube)
-        const preferred =
-          d.servers?.find((s) => /updown|streamwish|filelions|mixdrop|videotube/i.test(s.name)) ||
-          d.servers?.[0];
-        if (preferred) pick(preferred);
-      })
-      .catch((e) => (error = e.message));
+    untrack(() => {
+      data = null;
+      error = '';
+      stream = null;
+      resolveError = '';
+
+      api
+        .post(currentId)
+        .then((d) => {
+          data = d;
+          syncWatchlistStatus();
+          // Priority: high-speed direct native servers first (UpDown, StreamWish, FileLions, VideoTube)
+          const preferred =
+            d.servers?.find((s) => /updown|streamwish|filelions|videotube/i.test(s.name)) ||
+            d.servers?.[0];
+          if (preferred) pick(preferred);
+        })
+        .catch((e) => (error = e.message));
+    });
   });
 
   async function pick(srv) {
