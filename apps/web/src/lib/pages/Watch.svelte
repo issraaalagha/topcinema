@@ -38,9 +38,9 @@
       .then((d) => {
         data = d;
         syncWatchlistStatus();
-        // Priority: high-speed direct native servers first (LuluStream, UpDown, StreamWish, FileLions)
+        // Priority: high-speed direct native servers first (VideoTube, UpDown, StreamWish, FileLions)
         const preferred =
-          d.servers?.find((s) => /lulu|updown|streamwish|filelions|vidtube/i.test(s.name)) ||
+          d.servers?.find((s) => /videotube|vidtube|updown|streamwish|filelions/i.test(s.name)) ||
           d.servers?.[0];
         if (preferred) pick(preferred);
       })

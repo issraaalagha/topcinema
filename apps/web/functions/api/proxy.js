@@ -44,18 +44,11 @@ export async function onRequest(context) {
   let referer = customReferer || `${parsedTarget.protocol}//${parsedTarget.hostname}/`;
   let origin = referer.replace(/\/$/, '');
 
-  const clientIp = request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for');
-
   const fetchHeaders = new Headers();
   fetchHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
   fetchHeaders.set('Referer', referer);
   fetchHeaders.set('Origin', origin);
   fetchHeaders.set('Accept', '*/*');
-  if (clientIp) {
-    fetchHeaders.set('X-Forwarded-For', clientIp);
-    fetchHeaders.set('X-Real-IP', clientIp);
-    fetchHeaders.set('CF-Connecting-IP', clientIp);
-  }
 
   // Forward Range header if present (crucial for MP4 seeking & buffer chunks)
   const range = request.headers.get('range');

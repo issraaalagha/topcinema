@@ -60,7 +60,11 @@ class CastManager {
    * Setup Cast Framework
    */
   setupCastFramework() {
-    const cast = window.chrome.cast;
+    const cast = window.chrome?.cast;
+    if (!cast || !cast.framework || !cast.framework.CastContext) {
+      console.log('[CastManager] Cast framework not loaded or available on this browser');
+      return;
+    }
     const context = cast.framework.CastContext.getInstance();
 
     // Configure cast options
