@@ -7,11 +7,36 @@ import { UPSTREAM_URL, jsonResponse, CORS_HEADERS } from '../../_utils.js';
 function extractStreamFromHtml(html) {
   if (!html) return null;
   const source = html;
-  const match = source.match(/"(?:hls2|hls|file|src)"\s*:\s*"([^"]+\.(?:m3u8|mp4)[^"]*)"/i) ||
-    source.match(/(?:file|src)\s*:\s*["']([^"']+\.(?:m3u8|mp4)[^"']*)["']/i) ||
-    source.match(/https?:\/\/[^"'\s\\]+\.(?:m3u8|mp4)[^"'\s\\]*/i);
-
-  return match ? (match[1] || match[0]).replace(/\\/g, '') : null;
+  
+  // Pattern 1: JSON-like "hls2", "hls", "file", "src" properties
+  let match = source.match(/"(?:hls2|hls|file|src|source|video)"\s*:\s*"([^"]+\.(?:m3u8|mp4)[^"]*)"/i);
+  if (match && match[1]) return match[1].replace(/\\/g, '');
+  
+  // Pattern 2: JavaScript variable assignments
+  match = source.match(/(?:file|src|source|video)\s*[:=]\s*["']([^"']+\.(?:m3u8|mp4)[^"']*)["']/i);
+  if (match && match[1]) return match[1].replace(/\\/g, '');
+  
+  // Pattern 3: Direct URL in HTML/JS (not inside quotes)
+  match = source.match(/https?:\/\/[^\s"'<>]+\.(?:m3u8|mp4)(?:\?[^\s"'<>]*)?/i);
+  if (match && match[0]) return match[0].replace(/\\/g, '');
+  
+  // Pattern 4: Base64 or encoded patterns
+  match = source.match(/atob\s*\(\s*["']([A-Za-z0-9+/=]+)["']\s*\)/);
+  if (match && match[1]) {
+    try {
+      const decoded = atob(match[1]);
+      if (decoded.match(/\.(?:m3u8|mp4)/i)) return decoded;
+    } catch {}
+  }
+  
+  // Pattern 5: Common video platforms
+  match = source.match(/(?:videotube|streamwish|filelions|lulustream|updown)[\w.-]*\/(?:e|embed|v)\/([a-zA-Z0-9_-]+)/i);
+  if (match && match[0]) {
+    // Return the embed URL itself if no direct stream found
+    return match[0].startsWith('http') ? match[0] : `https://${match[0]}`;
+  }
+  
+  return null;
 }
 
 export async function onRequest(context) {
@@ -64,24 +89,53 @@ export async function onRequest(context) {
     } catch {}
 
     let directStreamUrl = null;
-    const debugInfo = { embedUrl, embedStatus: 0, embedLength: 0, extracted: null, err: null };
+    const debugInfo = { embedUrl, embedStatus: 0, embedLength: 0, extracted: null, err: null, attempts: [] };
 
+    // Attempt 1: Fetch embed page with standard browser headers
     try {
       const embedRes = await fetch(embedUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
-          Referer: UPSTREAM_URL,
+          'Referer': UPSTREAM_URL,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
         },
       });
       debugInfo.embedStatus = embedRes.status;
+      debugInfo.attempts.push({ method: 'embed-page', status: embedRes.status });
+      
       if (embedRes.ok) {
         const embedBody = await embedRes.text();
         debugInfo.embedLength = embedBody.length;
         directStreamUrl = extractStreamFromHtml(embedBody);
         debugInfo.extracted = directStreamUrl;
+        
+        // Try common stream path patterns if no direct URL found
+        if (!directStreamUrl && embedUrl.includes('/e/')) {
+          const videoId = embedUrl.match(/\/e\/([a-zA-Z0-9_-]+)/)?.[1];
+          if (videoId) {
+            const commonPaths = [
+              embedOrigin + `hls/${videoId}/index.m3u8`,
+              embedOrigin + `stream/${videoId}.m3u8`,
+              embedOrigin + `api/source/${videoId}`,
+            ];
+            
+            for (const testUrl of commonPaths) {
+              try {
+                const testRes = await fetch(testUrl, { method: 'HEAD' });
+                if (testRes.ok) {
+                  directStreamUrl = testUrl;
+                  debugInfo.attempts.push({ method: 'path-guess', url: testUrl, found: true });
+                  break;
+                }
+              } catch {}
+            }
+          }
+        }
       }
     } catch (err) {
       debugInfo.err = err.message;
+      debugInfo.attempts.push({ method: 'embed-page', error: err.message });
     }
 
     if (directStreamUrl) {
