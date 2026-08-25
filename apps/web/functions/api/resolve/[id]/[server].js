@@ -9,27 +9,30 @@ import { UPSTREAM_URL, jsonResponse, CORS_HEADERS } from '../../_utils.js';
 // 1. Core Cryptographic & Obfuscation Utilities
 // ─────────────────────────────────────────────────────────────────────────────
 
-function universalUnpack(packed) {
-  try {
-    const unpackRegex = /eval\(function\(p,a,c,k,e,d\)\s*\{[\s\S]*?\}\s*\(\s*['"]([\s\S]*?)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*['"]([\s\S]*?)['"]\.split\(['"]\|['"]\)/;
-    const match = packed.match(unpackRegex);
-    if (!match) return packed;
+function universalUnpack(html) {
+  if (!html || !html.includes('eval(function(p,a,c,k,e,d)')) return html;
+  
+  let result = html;
+  const regex = /eval\(function\(p,a,c,k,e,d\)[\s\S]*?\}\s*\(\s*(['"][\s\S]*?['"])\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(['"][\s\S]*?['"])\.split\(['"]\|['"]\)/g;
+  
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    try {
+      let p = match[1].slice(1, -1);
+      const a = parseInt(match[2], 10);
+      let c = parseInt(match[3], 10);
+      const k = match[4].slice(1, -1).split('|');
 
-    let p = match[1];
-    let a = parseInt(match[2], 10);
-    let c = parseInt(match[3], 10);
-    let k = match[4].split('|');
-
-    while (c--) {
-      if (k[c]) {
-        const regex = new RegExp(`\\b${c.toString(a)}\\b`, 'g');
-        p = p.replace(regex, k[c]);
+      while (c--) {
+        if (k[c]) {
+          const re = new RegExp(`\\b${c.toString(a)}\\b`, 'g');
+          p = p.replace(re, k[c]);
+        }
       }
-    }
-    return p;
-  } catch {
-    return packed;
+      result += '\n' + p;
+    } catch {}
   }
+  return result;
 }
 
 function cleanStreamUrl(url) {
@@ -56,11 +59,7 @@ const UpDownEngine = {
     });
     if (!res.ok) return null;
     const html = await res.text();
-    let unpacked = html;
-    if (html.includes('eval(function(p,a,c,k,e,d)')) {
-      const packed = html.match(/eval\(function\(p,a,c,k,e,d\)[\s\S]*?\.split\('\|'\)\s*\)/gs) || [];
-      for (const b of packed) unpacked += '\n' + universalUnpack(b);
-    }
+    const unpacked = universalUnpack(html);
     const mp4Match = unpacked.match(/https?:\/\/[^\s"'<>]+\.(?:mp4|m3u8)[^\s"'<>]*/i) ||
                      unpacked.match(/(?:file|src|source)\s*[:=]\s*["']([^"']+\.(?:mp4|m3u8)[^"']*)["']/i);
     const raw = mp4Match ? (mp4Match[1] || mp4Match[0]) : null;

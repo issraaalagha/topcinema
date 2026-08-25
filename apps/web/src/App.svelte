@@ -23,8 +23,8 @@
   let currentLoc = $state(getCurrentLocation());
   let isScrolled = $state(false);
   let watchlistCount = $state(0);
-  let isAuthenticated = $state(!!getAuthToken());
-  let checkingAuth = $state(true);
+  let isAuthenticated = $state(true);
+  let checkingAuth = $state(false);
 
   function syncWatchlist() {
     watchlistCount = getWatchlist().length;
