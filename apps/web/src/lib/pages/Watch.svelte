@@ -115,7 +115,7 @@
     <div class="err-icon">⚠️</div>
     <h2>تعذر فتح صفحة العرض</h2>
     <p>{error}</p>
-    <a href="#/" class="back-link">العودة للرئيسية</a>
+    <a href="/" class="back-link">العودة للرئيسية</a>
   </div>
 {:else if !data}
   <div class="watch-loading">

@@ -5,7 +5,22 @@
   import { getWatchlist, syncFromCloud } from './lib/store.js';
   import { api, getAuthToken } from './lib/api.js';
 
-  let hash = $state(location.hash || '#/');
+  function getCurrentLocation() {
+    if (typeof window === 'undefined') return { path: '/', search: '' };
+    
+    // Auto upgrade legacy hash urls (e.g., /#/watch/xyz -> /watch/xyz)
+    if (window.location.hash && window.location.hash.startsWith('#/')) {
+      const cleanPath = window.location.hash.slice(1);
+      window.history.replaceState(null, '', cleanPath);
+    }
+    
+    return {
+      path: window.location.pathname || '/',
+      search: window.location.search || ''
+    };
+  }
+
+  let currentLoc = $state(getCurrentLocation());
   let isScrolled = $state(false);
   let watchlistCount = $state(0);
   let isAuthenticated = $state(!!getAuthToken());
@@ -53,15 +68,45 @@
     return () => window.removeEventListener('scroll', handleScroll);
   });
 
-  window.addEventListener('hashchange', () => {
-    hash = location.hash || '#/';
+  function navigateTo(url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      window.location.href = url;
+      return;
+    }
+    window.history.pushState(null, '', url);
+    currentLoc = getCurrentLocation();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleLinkClick(e) {
+    const anchor = e.target.closest('a');
+    if (!anchor) return;
+    const href = anchor.getAttribute('href');
+    if (href && (href.startsWith('/') || href.startsWith('#/'))) {
+      e.preventDefault();
+      const targetUrl = href.startsWith('#/') ? href.slice(1) : href;
+      navigateTo(targetUrl);
+    }
+  }
+
+  $effect(() => {
+    const onPopState = () => {
+      currentLoc = getCurrentLocation();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('popstate', onPopState);
+    window.addEventListener('hashchange', onPopState);
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('hashchange', onPopState);
+    };
   });
 
   const route = $derived.by(() => {
-    const watchMatch = hash.match(/^#\/watch\/(.+)/);
+    const p = currentLoc.path;
+    const watchMatch = p.match(/^\/watch\/(.+)/);
     if (watchMatch) return { page: 'watch', id: decodeURIComponent(watchMatch[1].split('?')[0]) };
-    if (hash === '#/watchlist') return { page: 'home', tab: 'watchlist' };
+    if (p === '/watchlist') return { page: 'home', tab: 'watchlist' };
     return { page: 'home', tab: 'all' };
   });
 
@@ -76,6 +121,8 @@
   }
 </script>
 
+<svelte:window onclick={handleLinkClick} />
+
 {#if !isAuthenticated && !checkingAuth}
   <!-- Master Passcode Security Gate -->
   <PasscodeGate onAuthenticated={handleAuthenticated} />
@@ -83,14 +130,14 @@
 
 <header class="topbar {isScrolled ? 'scrolled' : ''}">
   <div class="topbar-inner">
-    <a href="#/" class="brand" aria-label="توب سينما الرئيسية">
+    <a href="/" class="brand" aria-label="توب سينما الرئيسية">
       <span class="brand-mark">TC</span>
       <span class="brand-name">توب سينما</span>
     </a>
 
     <nav class="nav-links" aria-label="القائمة الرئيسية">
-      <a href="#/" class="nav-link {hash === '#/' ? 'active' : ''}">الرئيسية</a>
-      <a href="#/watchlist" class="nav-link {hash === '#/watchlist' ? 'active' : ''}">
+      <a href="/" class="nav-link {currentLoc.path === '/' ? 'active' : ''}">الرئيسية</a>
+      <a href="/watchlist" class="nav-link {currentLoc.path === '/watchlist' ? 'active' : ''}">
         <span>قائمتي</span>
         {#if watchlistCount > 0}
           <span class="count-badge">{watchlistCount}</span>
@@ -99,7 +146,7 @@
     </nav>
 
     <div class="header-actions">
-      <a href="#/" class="search-nav-btn" title="البحث">
+      <a href="/" class="search-nav-btn" title="البحث">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
           <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
         </svg>

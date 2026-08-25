@@ -60,7 +60,7 @@
       {/if}
 
       <div class="hero-actions">
-        <a href={'#/watch/' + item.id} class="btn-primary">
+        <a href={'/watch/' + item.id} class="btn-primary">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
             <path d="M8 5v14l11-7z"/>
           </svg>

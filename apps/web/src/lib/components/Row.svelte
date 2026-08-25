@@ -48,7 +48,7 @@
 
     <div class="track" bind:this={trackEl}>
       {#each items as it, idx (`${it.id || ''}_${idx}`)}
-        <a class="card" href={'#/watch/' + it.id}>
+        <a class="card" href={'/watch/' + it.id}>
           <div class="poster-wrap">
             <img
               loading="lazy"
