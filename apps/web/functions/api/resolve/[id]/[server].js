@@ -76,11 +76,7 @@ const VidTubeEngine = {
     });
     if (!res.ok) return null;
     const html = await res.text();
-    let unpacked = html;
-    if (html.includes('eval(function(p,a,c,k,e,d)')) {
-      const packed = html.match(/eval\(function\(p,a,c,k,e,d\).*?\.split\('\|'\).*?\)/gs) || [];
-      for (const b of packed) unpacked += '\n' + universalUnpack(b);
-    }
+    const unpacked = universalUnpack(html);
     const hlsMatch = unpacked.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/i) ||
                      unpacked.match(/(?:file|src|source)\s*[:=]\s*["']([^"']+\.m3u8[^"']*)["']/i);
     const raw = hlsMatch ? (hlsMatch[1] || hlsMatch[0]) : null;
@@ -97,11 +93,7 @@ const StreamWishEngine = {
     });
     if (!res.ok) return null;
     const html = await res.text();
-    let unpacked = html;
-    if (html.includes('eval(function(p,a,c,k,e,d)')) {
-      const packed = html.match(/eval\(function\(p,a,c,k,e,d\).*?\.split\('\|'\).*?\)/gs) || [];
-      for (const b of packed) unpacked += '\n' + universalUnpack(b);
-    }
+    const unpacked = universalUnpack(html);
     const hlsMatch = unpacked.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/i) ||
                      unpacked.match(/(?:file|src|source)\s*[:=]\s*["']([^"']+\.m3u8[^"']*)["']/i);
     const raw = hlsMatch ? (hlsMatch[1] || hlsMatch[0]) : null;
@@ -118,11 +110,7 @@ const FileLionsEngine = {
     });
     if (!res.ok) return null;
     const html = await res.text();
-    let unpacked = html;
-    if (html.includes('eval(function(p,a,c,k,e,d)')) {
-      const packed = html.match(/eval\(function\(p,a,c,k,e,d\).*?\.split\('\|'\).*?\)/gs) || [];
-      for (const b of packed) unpacked += '\n' + universalUnpack(b);
-    }
+    const unpacked = universalUnpack(html);
     const hlsMatch = unpacked.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/i) ||
                      unpacked.match(/(?:file|src|source)\s*[:=]\s*["']([^"']+\.m3u8[^"']*)["']/i);
     const raw = hlsMatch ? (hlsMatch[1] || hlsMatch[0]) : null;

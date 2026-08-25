@@ -33,8 +33,14 @@
     // Destroy existing instances cleanly
     cleanup();
 
+    const PlyrConstructor = (typeof Plyr === 'function' ? Plyr : Plyr?.default) || window.Plyr;
+    if (!PlyrConstructor) {
+      console.warn('[Plyr] Constructor not found');
+      return;
+    }
+
     // 1. Setup Plyr Instance with Full 2026 Features & Arabic Localization
-    player = new Plyr(videoElement, {
+    player = new PlyrConstructor(videoElement, {
       controls: [
         'play-large',
         'play',

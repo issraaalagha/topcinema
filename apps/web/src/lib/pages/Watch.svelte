@@ -46,8 +46,9 @@
           data = d;
           syncWatchlistStatus();
           
-          // Auto-pick the highest-speed VIP server (UpDown first, then others)
+          // Auto-pick the highest-speed VIP server (VideoTube first for adaptive HLS, then UpDown)
           const preferred =
+            d.servers?.find((s) => /vidtube|videotube/i.test(s.name)) ||
             d.servers?.find((s) => /updown/i.test(s.name)) ||
             d.servers?.[0];
           if (preferred) pick(preferred);
