@@ -93,6 +93,15 @@ export async function onRequest(context) {
     if (val) resHeaders.set(h, val);
   }
 
+  // Ensure HTML5 video player compatible Content-Type for MP4 & TS video streams
+  if (!isM3u8) {
+    if (targetUrl.includes('.mp4') || !resHeaders.get('content-type') || resHeaders.get('content-type') === 'application/octet-stream') {
+      resHeaders.set('Content-Type', 'video/mp4');
+    } else if (targetUrl.includes('.ts')) {
+      resHeaders.set('Content-Type', 'video/mp2t');
+    }
+  }
+
   // ── M3U8 Playlist Handling: Rewrite all relative and absolute URLs ────────
   if (isM3u8) {
     resHeaders.set('Content-Type', 'application/vnd.apple.mpegurl');
