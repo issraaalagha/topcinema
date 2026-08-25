@@ -138,13 +138,13 @@
   .hero-backdrop {
     position: absolute;
     top: 0;
-    left: auto;
-    right: 0;
-    width: 60%;
+    left: 0;
+    right: auto;
+    width: 65%;
     height: 100%;
     object-fit: cover;
     object-position: top center;
-    filter: brightness(0.85) contrast(1.1);
+    filter: brightness(0.9) contrast(1.05);
     transition: transform 0.8s ease;
   }
 
@@ -152,16 +152,16 @@
     transform: scale(1.03);
   }
 
-  /* Cinematic Vignettes (Netflix-style Edge Fading) */
+  /* Cinematic Vignettes for Arabic (RTL Layout) */
   .hero-vignette-left {
     position: absolute;
     inset: 0;
     background: linear-gradient(
-      to left,
+      to right,
       transparent 0%,
-      rgba(7, 9, 14, 0.4) 40%,
+      rgba(7, 9, 14, 0.3) 35%,
       rgba(7, 9, 14, 0.85) 60%,
-      rgba(7, 9, 14, 1) 80%
+      rgba(7, 9, 14, 1) 85%
     );
   }
 
