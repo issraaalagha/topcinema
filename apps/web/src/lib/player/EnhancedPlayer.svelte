@@ -42,12 +42,15 @@
   let qualityLevels = $state([]);
   let currentQuality = $state(-1); // -1 = auto
 
-  onMount(() => {
-    if (strategy === 'direct') {
+  $effect(() => {
+    if (src && videoElement && strategy === 'direct') {
+      cleanup();
       initializeDirectPlayer();
     }
+  });
+
+  onMount(() => {
     initializeChromecast();
-    
     // Auto-hide controls after 3 seconds
     startControlsTimer();
   });
@@ -57,7 +60,9 @@
   });
 
   function initializeDirectPlayer() {
-    if (!videoElement) return;
+    if (!videoElement || !src) return;
+    loading = true;
+    error = null;
 
     // Detect video type
     const videoType = type === 'auto' ? detectType(src) : type;
