@@ -42,8 +42,8 @@ export const api = {
     if (q) p.set('q', q);
     return request(`${BASE}/catalog?${p}`);
   },
-  post: (id) => request(`${BASE}/post/${id}`),
-  resolve: (id, server) => request(`${BASE}/resolve/${id}/${server}?_cb=${Date.now()}`),
+  post: (id) => request(`${BASE}/post/${encodeURIComponent(id)}`),
+  resolve: (id, server) => request(`${BASE}/resolve/${encodeURIComponent(id)}/${encodeURIComponent(server)}?_cb=${Date.now()}`),
 
   // Auth
   login: async (passcode, remember = true) => {
