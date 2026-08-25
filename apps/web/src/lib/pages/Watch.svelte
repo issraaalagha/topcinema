@@ -1,7 +1,8 @@
 <script>
   import { api } from '../api.js';
-  import Player from '../player/Player.svelte';
+  import EnhancedPlayer from '../player/EnhancedPlayer.svelte';
   import { isInWatchlist, toggleWatchlist } from '../store.js';
+  import { videoExtractor } from '../services/videoExtractor.js';
 
   let { id } = $props();
 
@@ -13,6 +14,8 @@
   let resolveError = $state('');
   let inList = $state(false);
   let copied = $state(false);
+  let extractionStrategy = $state('direct'); // 'direct' or 'iframe'
+  let requiresAdBlock = $state(false);
 
   function syncWatchlistStatus() {
     if (id) inList = isInWatchlist(id);
@@ -49,14 +52,63 @@
     stream = null;
     resolveError = '';
     resolving = true;
+    extractionStrategy = 'direct';
+    requiresAdBlock = false;
+
     try {
+      // Step 1: Get embed URL from API
       const r = await api.resolve(id, srv.server);
-      if (r.ok && r.url) {
-        stream = r;
-      } else {
-        resolveError = r.error || 'تعذر تشغيل هذا السيرفر — يُرجى اختيار سيرفر آخر من القائمة';
+      
+      if (!r.ok || !r.url) {
+        resolveError = r.error || 'تعذر الحصول على رابط السيرفر';
+        resolving = false;
+        return;
       }
+
+      const embedUrl = r.url;
+      console.log('[Watch] Embed URL:', embedUrl);
+
+      // Step 2: Try direct extraction first (Hybrid Strategy)
+      console.log('[Watch] Attempting direct extraction...');
+      const extraction = await videoExtractor.extract(embedUrl, srv.name);
+
+      if (extraction.success) {
+        if (extraction.strategy === 'direct') {
+          // Success: Direct video URL extracted
+          console.log('[Watch] ✅ Direct extraction successful:', extraction.type);
+          stream = {
+            url: extraction.url,
+            type: extraction.type,
+            quality: extraction.quality,
+            server: extraction.server
+          };
+          extractionStrategy = 'direct';
+          requiresAdBlock = false;
+        } else if (extraction.strategy === 'iframe') {
+          // Fallback: Use iframe with ad-blocking
+          console.log('[Watch] 📺 Falling back to iframe (ad-blocking enabled)');
+          stream = {
+            url: extraction.url,
+            type: 'embed',
+            server: extraction.server
+          };
+          extractionStrategy = 'iframe';
+          requiresAdBlock = extraction.requiresAdBlock || false;
+        }
+      } else {
+        // Extraction failed: fallback to iframe
+        console.log('[Watch] ⚠️ Extraction failed, using iframe fallback');
+        stream = {
+          url: embedUrl,
+          type: 'embed',
+          server: srv.name
+        };
+        extractionStrategy = 'iframe';
+        requiresAdBlock = true;
+      }
+
     } catch (e) {
+      console.error('[Watch] Error:', e);
       resolveError = 'فشل معالجة رابط السيرفر: ' + e.message;
     } finally {
       resolving = false;
@@ -113,11 +165,20 @@
             <p>جارٍ تحليل السيرفر وفك تشفير البث المباشر… ⚡</p>
           </div>
         {:else if stream}
-          <Player
-            {id}
+          <EnhancedPlayer
             src={stream.url}
             title={data.post.title}
             poster={data.post.poster}
+            type={stream.type}
+            strategy={extractionStrategy}
+            requiresAdBlock={requiresAdBlock}
+            onError={(err) => {
+              console.error('[Player] Error:', err);
+              resolveError = 'فشل تشغيل الفيديو. جرب سيرفر آخر.';
+            }}
+            onReady={() => {
+              console.log('[Player] Ready');
+            }}
           />
         {:else}
           <div class="player-shell error-msg">
