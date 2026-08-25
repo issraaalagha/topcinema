@@ -56,7 +56,6 @@
     requiresAdBlock = false;
 
     try {
-      // Step 1: Get embed URL from API
       const r = await api.resolve(id, srv.server);
       
       if (!r.ok || !r.url) {
@@ -65,47 +64,16 @@
         return;
       }
 
-      const embedUrl = r.url;
-      console.log('[Watch] Embed URL:', embedUrl);
-
-      // Step 2: Try direct extraction first (Hybrid Strategy)
-      console.log('[Watch] Attempting direct extraction...');
-      const extraction = await videoExtractor.extract(embedUrl, srv.name);
-
-      if (extraction.success) {
-        if (extraction.strategy === 'direct') {
-          // Success: Direct video URL extracted
-          console.log('[Watch] ✅ Direct extraction successful:', extraction.type);
-          stream = {
-            url: extraction.url,
-            type: extraction.type,
-            quality: extraction.quality,
-            server: extraction.server
-          };
-          extractionStrategy = 'direct';
-          requiresAdBlock = false;
-        } else if (extraction.strategy === 'iframe') {
-          // Fallback: Use iframe with ad-blocking
-          console.log('[Watch] 📺 Falling back to iframe (ad-blocking enabled)');
-          stream = {
-            url: extraction.url,
-            type: 'embed',
-            server: extraction.server
-          };
-          extractionStrategy = 'iframe';
-          requiresAdBlock = extraction.requiresAdBlock || false;
-        }
-      } else {
-        // Extraction failed: fallback to iframe
-        console.log('[Watch] ⚠️ Extraction failed, using iframe fallback');
-        stream = {
-          url: embedUrl,
-          type: 'embed',
-          server: srv.name
-        };
-        extractionStrategy = 'iframe';
-        requiresAdBlock = true;
-      }
+      console.log('[Watch] Resolved Stream URL:', r.url);
+      
+      stream = {
+        url: r.url,
+        type: r.type || (r.url.includes('.mp4') ? 'mp4' : 'hls'),
+        server: srv.name
+      };
+      
+      extractionStrategy = 'direct';
+      requiresAdBlock = false;
 
     } catch (e) {
       console.error('[Watch] Error:', e);

@@ -1,13 +1,47 @@
 import { UPSTREAM_URL, jsonResponse, CORS_HEADERS } from '../../_utils.js';
 
 /**
+ * Robust Unpacker for Dean Edwards packed JS.
+ * Used for VideoTube, FileLions, and other common embed servers.
+ */
+function universalUnpack(packed) {
+  try {
+    const unpackRegex = /return\s+p;?\s*\}?\s*\(\s*['"](.*?)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*['"](.*?)['"]\.split\(['"]\|['"]\)/s;
+    const match = packed.match(unpackRegex);
+    if (!match) return packed;
+
+    let p = match[1];
+    let a = parseInt(match[2], 10);
+    let c = parseInt(match[3], 10);
+    let k = match[4].split('|');
+
+    while (c--) {
+      if (k[c]) {
+        const regex = new RegExp(`\\b${c.toString(a)}\\b`, 'g');
+        p = p.replace(regex, k[c]);
+      }
+    }
+    return p;
+  } catch (err) {
+    return packed;
+  }
+}
+
+/**
  * Extract only explicit HLS/MP4 URLs from third-party embed HTML.
- * Dynamic JavaScript from embeds is never executed or unpacked.
  */
 function extractStreamFromHtml(html) {
   if (!html) return null;
-  const source = html;
+  let source = html;
   
+  // Try unpacking if packed script found
+  if (source.includes('eval(function(p,a,c,k,e,d)')) {
+    const packedBlocks = source.match(/eval\(function\(p,a,c,k,e,d\).*?\.split\('\|'\).*?\)/gs) || [];
+    for (const block of packedBlocks) {
+      source += '\n' + universalUnpack(block);
+    }
+  }
+
   // Pattern 1: JSON-like "hls2", "hls", "file", "src" properties
   let match = source.match(/"(?:hls2|hls|file|src|source|video)"\s*:\s*"([^"]+\.(?:m3u8|mp4)[^"]*)"/i);
   if (match && match[1]) return match[1].replace(/\\/g, '');
@@ -27,13 +61,6 @@ function extractStreamFromHtml(html) {
       const decoded = atob(match[1]);
       if (decoded.match(/\.(?:m3u8|mp4)/i)) return decoded;
     } catch {}
-  }
-  
-  // Pattern 5: Common video platforms
-  match = source.match(/(?:videotube|streamwish|filelions|lulustream|updown)[\w.-]*\/(?:e|embed|v)\/([a-zA-Z0-9_-]+)/i);
-  if (match && match[0]) {
-    // Return the embed URL itself if no direct stream found
-    return match[0].startsWith('http') ? match[0] : `https://${match[0]}`;
   }
   
   return null;

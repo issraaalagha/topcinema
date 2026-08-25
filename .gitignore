@@ -43,4 +43,4 @@ pnpm-debug.log*
 **/debug.*.js
 
 # API service (not deployed to Cloudflare Pages)
-services/
+/services/
