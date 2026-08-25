@@ -11,7 +11,7 @@ import { UPSTREAM_URL, jsonResponse, CORS_HEADERS } from '../../_utils.js';
 
 function universalUnpack(packed) {
   try {
-    const unpackRegex = /return\s+p;?\s*\}?\s*\(\s*['"](.*?)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*['"](.*?)['"]\.split\(['"]\|['"]\)/s;
+    const unpackRegex = /eval\(function\(p,a,c,k,e,d\)\s*\{[\s\S]*?\}\s*\(\s*['"]([\s\S]*?)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*['"]([\s\S]*?)['"]\.split\(['"]\|['"]\)/;
     const match = packed.match(unpackRegex);
     if (!match) return packed;
 
@@ -56,10 +56,15 @@ const UpDownEngine = {
     });
     if (!res.ok) return null;
     const html = await res.text();
-    const mp4Match = html.match(/https?:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*/i) ||
-                     html.match(/(?:file|src|source)\s*[:=]\s*["']([^"']+\.mp4[^"']*)["']/i);
+    let unpacked = html;
+    if (html.includes('eval(function(p,a,c,k,e,d)')) {
+      const packed = html.match(/eval\(function\(p,a,c,k,e,d\)[\s\S]*?\.split\('\|'\)\s*\)/gs) || [];
+      for (const b of packed) unpacked += '\n' + universalUnpack(b);
+    }
+    const mp4Match = unpacked.match(/https?:\/\/[^\s"'<>]+\.(?:mp4|m3u8)[^\s"'<>]*/i) ||
+                     unpacked.match(/(?:file|src|source)\s*[:=]\s*["']([^"']+\.(?:mp4|m3u8)[^"']*)["']/i);
     const raw = mp4Match ? (mp4Match[1] || mp4Match[0]) : null;
-    return raw ? { url: cleanStreamUrl(raw), type: 'mp4' } : null;
+    return raw ? { url: cleanStreamUrl(raw), type: raw.includes('.m3u8') ? 'hls' : 'mp4' } : null;
   }
 };
 
