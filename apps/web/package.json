@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "hls.js": "^1.5.20",
-    "plyr": "^3.7.8"
+    "hls.js": "^1.7.1",
+    "plyr": "^3.8.4"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
