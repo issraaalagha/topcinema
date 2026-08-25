@@ -1,0 +1,15 @@
+{
+  "name": "topcinema-platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "services/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace services/api",
+    "dev:web": "npm run dev --workspace apps/web",
+    "start": "npm run dev --workspace services/api & npm run dev --workspace apps/web"
+  }
+}

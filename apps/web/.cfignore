@@ -1,0 +1,11 @@
+node_modules
+.git
+.vite
+.agent
+.mimosa
+*.log
+.DS_Store
+.env*
+!.env.example
+*.md
+!README.md
