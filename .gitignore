@@ -37,3 +37,10 @@ pnpm-debug.log*
 
 # Security
 .mimosa/
+
+# Debug files
+**/debug.js
+**/debug.*.js
+
+# API service (not deployed to Cloudflare Pages)
+services/

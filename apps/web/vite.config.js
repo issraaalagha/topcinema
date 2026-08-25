@@ -8,4 +8,24 @@ export default defineConfig({
       '/api': 'http://localhost:8787',
     },
   },
+  build: {
+    target: 'es2022',
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/hls.js')) {
+            return 'vendor-hls';
+          }
+          if (id.includes('node_modules/plyr')) {
+            return 'vendor-plyr';
+          }
+          if (id.includes('node_modules/svelte')) {
+            return 'vendor-svelte';
+          }
+        },
+      },
+    },
+  },
 });
