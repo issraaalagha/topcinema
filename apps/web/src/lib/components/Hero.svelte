@@ -19,37 +19,50 @@
 
 {#if item}
   <section class="hero" aria-label="العمل المميز">
-    <!-- Backdrop Image with layered gradients -->
-    <div class="hero-bg-container">
+    <!-- Ambient Depth Background Glow -->
+    <div class="hero-ambient-glow" style="background-image: url('{item.poster || '/icons/icon.svg'}')"></div>
+
+    <!-- Crisp Backdrop Poster with Right-Alight Cinematic Position -->
+    <div class="hero-backdrop-wrap">
       <img
-        class="hero-bg"
+        class="hero-backdrop"
         src={item.poster || '/icons/icon.svg'}
         alt={item.title}
         loading="eager"
         fetchpriority="high"
+        decoding="async"
       />
-      <div class="hero-gradient-overlay"></div>
+      <!-- Netflix-style Multi-Stop Vignette Gradients -->
+      <div class="hero-vignette-left"></div>
+      <div class="hero-vignette-bottom"></div>
+      <div class="hero-vignette-top"></div>
     </div>
 
-    <!-- Content -->
+    <!-- Foreground Content & Metadata -->
     <div class="hero-content">
       <div class="meta-row">
         {#if item.quality}
           <span class="badge badge-quality">{item.quality}</span>
         {/if}
         {#if item.imdb}
-          <span class="badge badge-imdb">★ {item.imdb} IMDb</span>
+          <span class="badge badge-imdb">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="#f5c518">
+              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+            </svg>
+            <span>{item.imdb}</span>
+          </span>
         {/if}
         {#if item.year}
           <span class="badge badge-year">{item.year}</span>
         {/if}
+        <span class="badge badge-featured">🔥 مميز اليوم</span>
       </div>
 
       <h1 class="hero-title">{item.title}</h1>
 
       {#if item.genres?.length}
         <div class="genre-tags">
-          {#each item.genres.slice(0, 3) as g}
+          {#each item.genres.slice(0, 4) as g}
             <span class="tag">{g}</span>
           {/each}
         </div>
@@ -89,165 +102,253 @@
   .hero {
     position: relative;
     width: 100%;
-    min-height: 480px;
+    min-height: 520px;
     display: flex;
-    align-items: flex-end;
-    padding: 60px 36px 40px;
-    margin-bottom: 18px;
+    align-items: center;
+    padding: 80px 48px 60px;
+    margin-bottom: 24px;
     overflow: hidden;
+    background: #07090e;
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   }
-  .hero-bg-container {
+
+  /* Ambient Glow Layer */
+  .hero-ambient-glow {
     position: absolute;
-    inset: 0;
+    inset: -20px;
+    background-size: cover;
+    background-position: center;
+    filter: blur(60px) opacity(0.35) saturate(1.8);
     z-index: 1;
+    transform: scale(1.1);
+    pointer-events: none;
   }
-  .hero-bg {
-    width: 100%;
+
+  /* Backdrop Poster Wrap */
+  .hero-backdrop-wrap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    overflow: hidden;
+  }
+
+  .hero-backdrop {
+    position: absolute;
+    top: 0;
+    left: auto;
+    right: 0;
+    width: 60%;
     height: 100%;
     object-fit: cover;
     object-position: top center;
-    filter: blur(20px) brightness(0.4) saturate(1.4);
-    transform: scale(1.15);
+    filter: brightness(0.85) contrast(1.1);
+    transition: transform 0.8s ease;
   }
-  .hero-gradient-overlay {
+
+  .hero:hover .hero-backdrop {
+    transform: scale(1.03);
+  }
+
+  /* Cinematic Vignettes (Netflix-style Edge Fading) */
+  .hero-vignette-left {
     position: absolute;
     inset: 0;
-    background: 
-      linear-gradient(to top, var(--bg) 5%, transparent 65%),
-      linear-gradient(to right, rgba(7, 9, 14, 0.95) 0%, rgba(7, 9, 14, 0.7) 40%, transparent 100%),
-      radial-gradient(ellipse at 80% 20%, rgba(229, 9, 20, 0.15), transparent 70%);
+    background: linear-gradient(
+      to left,
+      transparent 0%,
+      rgba(7, 9, 14, 0.4) 40%,
+      rgba(7, 9, 14, 0.85) 60%,
+      rgba(7, 9, 14, 1) 80%
+    );
   }
+
+  .hero-vignette-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 140px;
+    background: linear-gradient(to top, rgba(7, 9, 14, 1) 0%, transparent 100%);
+  }
+
+  .hero-vignette-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(to bottom, rgba(7, 9, 14, 0.8) 0%, transparent 100%);
+  }
+
+  /* Content */
   .hero-content {
     position: relative;
-    z-index: 2;
-    max-width: 640px;
+    z-index: 3;
+    max-width: 620px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
   }
+
   .meta-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex-wrap: wrap;
   }
+
   .badge {
-    padding: 4px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
     border-radius: var(--radius-sm);
     font-size: 12px;
     font-weight: 700;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(10px);
   }
+
+  .badge-featured {
+    background: rgba(229, 9, 20, 0.2);
+    border: 1px solid rgba(229, 9, 20, 0.4);
+    color: #ff4d57;
+  }
+
   .badge-quality {
     background: rgba(255, 255, 255, 0.15);
     color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    letter-spacing: 0.5px;
   }
+
   .badge-imdb {
-    background: rgba(245, 197, 24, 0.2);
-    color: var(--gold);
-    border: 1px solid rgba(245, 197, 24, 0.4);
+    background: rgba(245, 197, 24, 0.15);
+    color: #f5c518;
+    border: 1px solid rgba(245, 197, 24, 0.35);
   }
+
   .badge-year {
-    background: var(--bg-surface);
+    background: rgba(255, 255, 255, 0.08);
     color: var(--text-secondary);
     border: 1px solid var(--border-glass);
   }
+
   .hero-title {
-    font-size: 38px;
-    font-weight: 800;
-    line-height: 1.25;
+    font-size: 42px;
+    font-weight: 900;
+    line-height: 1.22;
     letter-spacing: -0.5px;
-    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+    color: #ffffff;
+    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.9);
   }
+
   .genre-tags {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
   }
+
   .tag {
-    font-size: 12.5px;
-    color: var(--text-secondary);
-    background: rgba(255, 255, 255, 0.08);
-    padding: 3px 10px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.09);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 4px 12px;
     border-radius: var(--radius-pill);
+    font-weight: 500;
   }
+
   .hero-story {
     font-size: 14.5px;
-    color: var(--text-secondary);
-    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.75;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
   }
+
   .hero-actions {
     display: flex;
     align-items: center;
     gap: 14px;
-    margin-top: 8px;
+    margin-top: 10px;
     flex-wrap: wrap;
   }
+
   .btn-primary {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 26px;
-    border-radius: var(--radius-md);
+    padding: 13px 28px;
+    border-radius: var(--radius-pill);
     background: linear-gradient(135deg, var(--accent), #b30710);
     color: #fff;
     font-weight: 700;
-    font-size: 15px;
-    box-shadow: 0 6px 24px var(--accent-glow);
+    font-size: 15.5px;
+    box-shadow: 0 6px 25px var(--accent-glow);
     transition: all var(--transition-fast);
+    cursor: pointer;
   }
+
   .btn-primary:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 8px 30px var(--accent-glow);
-    background: linear-gradient(135deg, var(--accent-hover), var(--accent));
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 8px 32px var(--accent-glow);
+    background: linear-gradient(135deg, #ff1a26, var(--accent));
   }
+
   .btn-secondary {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 20px;
-    border-radius: var(--radius-md);
-    background: var(--bg-glass);
-    border: 1px solid var(--border-glass);
-    color: var(--text);
+    padding: 13px 22px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
     font-weight: 600;
-    font-size: 14px;
-    backdrop-filter: blur(12px);
+    font-size: 14.5px;
+    backdrop-filter: blur(16px);
     transition: all var(--transition-fast);
+    cursor: pointer;
   }
+
   .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: var(--border-hover);
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.35);
     transform: translateY(-2px);
   }
+
   .btn-secondary.active {
-    background: rgba(16, 185, 129, 0.18);
+    background: rgba(16, 185, 129, 0.22);
     border-color: var(--success);
     color: var(--success);
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     .hero {
-      min-height: 380px;
-      padding: 32px 18px 26px;
+      min-height: 440px;
+      padding: 60px 24px 36px;
+      align-items: flex-end;
+    }
+    .hero-backdrop {
+      width: 100%;
+      opacity: 0.6;
+    }
+    .hero-vignette-left {
+      background: linear-gradient(to top, rgba(7, 9, 14, 0.95) 20%, rgba(7, 9, 14, 0.6) 70%, transparent 100%);
     }
     .hero-title {
-      font-size: 26px;
+      font-size: 28px;
     }
     .hero-story {
       font-size: 13.5px;
       -webkit-line-clamp: 2;
-    }
-    .btn-primary, .btn-secondary {
-      padding: 10px 18px;
-      font-size: 13.5px;
     }
   }
 </style>
