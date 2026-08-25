@@ -116,10 +116,14 @@
 </header>
 
 <main>
-  {#if route.page === 'home'}
-    <Home initialTab={route.tab} />
-  {:else if route.page === 'watch'}
-    <Watch id={route.id} />
+  {#if isAuthenticated}
+    {#if route.page === 'home'}
+      <Home initialTab={route.tab} />
+    {:else if route.page === 'watch'}
+      <Watch id={route.id} />
+    {/if}
+  {:else if !checkingAuth}
+    <div class="auth-required-placeholder"></div>
   {/if}
 </main>
 

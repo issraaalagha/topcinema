@@ -73,6 +73,13 @@ export function extractToken(request) {
     if (match) return match[1];
   }
 
+  // 3. From URL query parameter (for media/video player streaming)
+  try {
+    const url = new URL(request.url);
+    const tokenParam = url.searchParams.get('token');
+    if (tokenParam) return tokenParam;
+  } catch {}
+
   return null;
 }
 

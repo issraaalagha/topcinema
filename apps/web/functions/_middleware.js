@@ -10,9 +10,10 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
-  // 2. Allow public auth routes & assets
+  // 2. Allow public auth routes, media proxy & assets
   if (
     url.pathname.startsWith('/api/auth/') ||
+    url.pathname.startsWith('/api/proxy') ||
     !url.pathname.startsWith('/api/')
   ) {
     return next();
