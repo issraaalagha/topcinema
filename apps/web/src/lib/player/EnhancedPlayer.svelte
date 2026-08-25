@@ -231,9 +231,9 @@
   <!-- Official Plyr Native HTML5 Video Element -->
   <video
     bind:this={videoElement}
+    {src}
     {poster}
     playsinline
-    crossorigin="anonymous"
     preload="metadata"
   ></video>
 </div>
