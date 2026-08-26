@@ -10,6 +10,15 @@
   "scripts": {
     "dev:api": "npm run dev --workspace services/api",
     "dev:web": "npm run dev --workspace apps/web",
-    "start": "npm run dev --workspace services/api & npm run dev --workspace apps/web"
+    "start": "npm run dev --workspace services/api & npm run dev --workspace apps/web",
+    "deploy:worker": "wrangler deploy workers/extraction-api.js --name topcinema-api",
+    "dev:worker": "wrangler dev workers/extraction-api.js",
+    "extract": "python browser_extractor.py",
+    "serve:player": "npx http-server -p 8080 -o player.html",
+    "serve:player:https": "npx http-server -S -p 8443 -o player.html",
+    "test:extraction": "node scripts/test-extraction.js"
+  },
+  "devDependencies": {
+    "wrangler": "^3.80.0"
   }
 }

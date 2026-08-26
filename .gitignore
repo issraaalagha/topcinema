@@ -44,3 +44,33 @@ pnpm-debug.log*
 
 # API service (not deployed to Cloudflare Pages)
 /services/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv
+
+# Playwright
+.playwright/
+playwright-report/
+test-results/
+
+# Extraction results
+extraction_results.json
+results_*.txt
+
+# Certificates (for local HTTPS testing)
+*.pem
+*.key
+*.crt
+
+# Temp files
+tmp/
+temp/
+*.tmp

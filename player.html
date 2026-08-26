@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TopCinema Player - مشغل فيديو متقدم</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --surface-0: #05070C;
+            --surface-1: #0A0D12;
+            --surface-2: #0F131C;
+            --surface-3: #161D2B;
+            --surface-4: #1E2636;
+            --accent: #38BDF8;
+            --accent-dim: #1E3A8A;
+            --text-primary: #F1F5F9;
+            --text-secondary: #94A3B8;
+            --success: #6EE7B7;
+            --error: #F87171;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: var(--surface-0);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+        }
+
+        .container {
+            width: clamp(320px, 95vw, 1400px);
+            padding: clamp(1rem, 3vw, 2rem);
+        }
+
+        .header {
+            margin-block-end: clamp(1.5rem, 4vw, 3rem);
+        }
+
+        h1 {
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--accent), var(--success));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .player-wrapper {
+            background: var(--surface-2);
+            border-radius: 16px;
+            padding: clamp(1rem, 2vw, 1.5rem);
+            margin-block-end: clamp(1.5rem, 3vw, 2rem);
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%;
+            background: var(--surface-1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .controls {
+            display: grid;
+            gap: 1rem;
+            margin-block-start: 1.5rem;
+        }
+
+        .server-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .server-btn {
+            background: var(--surface-3);
+            color: var(--text-primary);
+            border: 2px solid transparent;
+            border-radius: 999px;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .server-btn:hover {
+            background: var(--surface-4);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .server-btn.active {
+            background: var(--accent);
+            color: var(--surface-0);
+        }
+
+        .server-btn.failed {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .cast-btn {
+            background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+            color: var(--text-primary);
+            border: none;
+            border-radius: 999px;
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: transform 0.2s;
+        }
+
+        .cast-btn:hover {
+            transform: scale(1.02);
+        }
+
+        .cast-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            background: var(--surface-3);
+            border-radius: 12px;
+            padding: 1rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .status.loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-block-start: 2rem;
+        }
+
+        .feature {
+            background: var(--surface-2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-block-end: 0.5rem;
+        }
+
+        .feature-title {
+            font-weight: 600;
+            color: var(--accent);
+            margin-block-end: 0.25rem;
+        }
+
+        .feature-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>TopCinema Player</h1>
+            <p style="color: var(--text-secondary); margin-block-start: 0.5rem;">
+                مشغل متقدم بدون إعلانات مع دعم Chromecast
+            </p>
+        </header>
+
+        <div class="player-wrapper">
+            <div class="video-container">
+                <video id="player" controls playsinline></video>
+            </div>
+
+            <div class="controls">
+                <div class="server-grid" id="serverGrid"></div>
+                
+                <button class="cast-btn" id="castBtn">
+                    <span>📡</span>
+                    <span>Cast to TV</span>
+                </button>
+
+                <div class="status" id="status">جاهز للتشغيل</div>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🚫</div>
+                <div class="feature-title">بدون إعلانات</div>
+                <div class="feature-desc">تشغيل نظيف بدون أي إعلانات مزعجة</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <div class="feature-desc">دعم كامل لجميع الأجهزة</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-title">سرعة فائقة</div>
+                <div class="feature-desc">استخراج مباشر من السيرفرات</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔄</div>
+                <div class="feature-title">سيرفرات متعددة</div>
+                <div class="feature-desc">8 سيرفرات احتياطية</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+    <script>
+        const MOVIE_ID = '240823'; // Mutiny (2026)
+        const API_URL = 'https://topcinemaa.co/wp-content/themes/movies2023/Ajaxat/Single/Server.php';
+        
+        const servers = [
+            { id: 0, name: 'VideoTube', type: 'iframe' },
+            { id: 1, name: 'UpDown', type: 'iframe' },
+            { id: 2, name: 'StreamWish', type: 'direct' },
+            { id: 3, name: 'Doodstream', type: 'iframe' },
+            { id: 4, name: 'Filelions', type: 'iframe' },
+            { id: 5, name: 'Streamtape', type: 'iframe' },
+            { id: 6, name: 'LuluStream', type: 'direct' },
+            { id: 7, name: 'Mixdrop', type: 'direct' }
+        ];
+
+        const player = document.getElementById('player');
+        const serverGrid = document.getElementById('serverGrid');
+        const castBtn = document.getElementById('castBtn');
+        const status = document.getElementById('status');
+
+        let currentServer = null;
+        let castSession = null;
+
+        // Initialize Chromecast
+        function initCast() {
+            window['__onGCastApiAvailable'] = (isAvailable) => {
+                if (isAvailable) {
+                    cast.framework.CastContext.getInstance().setOptions({
+                        receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+                        autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+                    });
+
+                    const context = cast.framework.CastContext.getInstance();
+                    context.addEventListener(
+                        cast.framework.CastContextEventType.CAST_STATE_CHANGED,
+                        (event) => {
+                            if (event.castState === cast.framework.CastState.CONNECTED) {
+                                castBtn.textContent = '📡 Connected to TV';
+                            } else {
+                                castBtn.textContent = '📡 Cast to TV';
+                            }
+                        }
+                    );
+                }
+            };
+        }
+
+        // Get server iframe URL
+        async function getServerUrl(serverId) {
+            try {
+                const formData = new FormData();
+                formData.append('id', MOVIE_ID);
+                formData.append('i', serverId);
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                });
+
+                const html = await response.text();
+                const match = html.match(/src="([^"]+)"/);
+                return match ? match[1] : null;
+            } catch (error) {
+                console.error(`Error fetching server ${serverId}:`, error);
+                return null;
+            }
+        }
+
+        // Load server
+        async function loadServer(server, btn) {
+            status.textContent = `جاري التحميل من ${server.name}`;
+            status.className = 'status loading';
+
+            // Remove active class from all buttons
+            document.querySelectorAll('.server-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const url = await getServerUrl(server.id);
+
+            if (!url) {
+                status.textContent = `فشل التحميل من ${server.name}`;
+                btn.classList.add('failed');
+                btn.classList.remove('active');
+                return;
+            }
+
+            if (server.type === 'direct') {
+                // Try to load directly
+                player.src = url;
+                currentServer = { name: server.name, url: url };
+                status.textContent = `يتم التشغيل من ${server.name}`;
+                status.className = 'status';
+            } else {
+                // For iframe servers, we need to extract the actual video URL
+                status.textContent = `${server.name} يتطلب استخراج إضافي`;
+                status.className = 'status';
+                
+                // Open in new tab as fallback
+                const link = document.createElement('a');
+                link.href = url;
+                link.target = '_blank';
+                link.click();
+            }
+        }
+
+        // Cast to Chromecast
+        function castToTV() {
+            if (!currentServer) {
+                alert('الرجاء اختيار سيرفر أولاً');
+                return;
+            }
+
+            const castContext = cast.framework.CastContext.getInstance();
+            const session = castContext.getCurrentSession();
+
+            if (session) {
+                const mediaInfo = new chrome.cast.media.MediaInfo(currentServer.url, 'video/mp4');
+                mediaInfo.metadata = new chrome.cast.media.MovieMetadata();
+                mediaInfo.metadata.title = 'Mutiny (2026)';
+
+                const request = new chrome.cast.media.LoadRequest(mediaInfo);
+                session.loadMedia(request).then(
+                    () => {
+                        status.textContent = 'يتم التشغيل على التلفاز';
+                    },
+                    (error) => {
+                        status.textContent = 'فشل Cast: ' + error;
+                    }
+                );
+            } else {
+                // Request cast
+                castContext.requestSession();
+            }
+        }
+
+        // Initialize
+        function init() {
+            // Create server buttons
+            servers.forEach(server => {
+                const btn = document.createElement('button');
+                btn.className = 'server-btn';
+                btn.textContent = server.name;
+                btn.onclick = () => loadServer(server, btn);
+                serverGrid.appendChild(btn);
+            });
+
+            // Cast button
+            castBtn.onclick = castToTV;
+
+            // Initialize Chromecast
+            initCast();
+        }
+
+        init();
+    </script>
+</body>
+</html>

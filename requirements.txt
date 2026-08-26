@@ -1,0 +1,13 @@
+# TopCinema Browser Extractor Requirements
+
+# Playwright for browser automation
+playwright>=1.40.0
+
+# Requests for HTTP calls
+requests>=2.31.0
+
+# Optional: BeautifulSoup for HTML parsing
+beautifulsoup4>=4.12.0
+
+# Optional: lxml for faster parsing
+lxml>=4.9.0
