@@ -1,6 +1,6 @@
 // Cloudflare Pages API Utilities & HTML Parsers
 
-export const UPSTREAM_URL = 'https://topcinemaa.co';
+export const UPSTREAM_URL = 'https://web.topcinemaa.live';
 
 export const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -43,7 +43,7 @@ export function parseMovieItems(html) {
 
   for (const block of matches) {
     try {
-      const linkMatch = block.match(/<a\s+href="https:\/\/topcinemaa\.co\/([^"\/]+)\/?"/i);
+      const linkMatch = block.match(/<a\s+href="https:\/\/(?:web\.)?topcinemaa\.(?:co|live)\/([^"\/]+)\/?"/i);
       if (!linkMatch) continue;
       
       const slug = linkMatch[1];

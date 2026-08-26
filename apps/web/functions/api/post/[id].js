@@ -61,7 +61,7 @@ export async function onRequest(context) {
     const language = langMatch ? cleanText(langMatch[1]) : '';
 
     const genres = [];
-    const genreMatches = [...htmlToParse.matchAll(/<a href="https:\/\/topcinemaa\.co\/genre\/[^"]+">([\s\S]*?)<\/a>/gi)];
+    const genreMatches = [...htmlToParse.matchAll(/<a href="https:\/\/(?:web\.)?topcinemaa\.(?:co|live)\/genre\/[^"]+">([\s\S]*?)<\/a>/gi)];
     for (const g of genreMatches) {
       const gText = cleanText(g[1]);
       if (gText && !genres.includes(gText)) genres.push(gText);

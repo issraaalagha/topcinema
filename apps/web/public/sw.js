@@ -1,10 +1,10 @@
 /**
  * TopCinema Service Worker
  * Enterprise-grade caching + Ad blocking for iframe embeds
- * @version 2.0.0
+ * @version 3.0.0 — network-first navigation (stale-shell fix)
  */
 
-const CACHE = 'topcinema-v2';
+const CACHE = 'topcinema-v3';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon.svg'];
 
 // Ad blocking patterns
@@ -87,8 +87,31 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Static assets: cache-first
-  if (e.request.method === 'GET' && url.origin === location.origin) {
+  // Navigations (HTML documents): network-first so new deploys reach users
+  // immediately, with cached shell as offline fallback.
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          if (res.ok && res.status === 200) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(e.request, { ignoreSearch: true }))
+    );
+    return;
+  }
+
+  // Hashed static assets: cache-first (safe — filename changes per build)
+  if (
+    e.request.method === 'GET' &&
+    url.origin === location.origin &&
+    (url.pathname.startsWith('/assets/') ||
+      url.pathname.startsWith('/icons/') ||
+      url.pathname.endsWith('.webmanifest'))
+  ) {
     e.respondWith(
       caches.match(e.request).then((hit) => {
         if (hit) return hit;
@@ -102,6 +125,7 @@ self.addEventListener('fetch', (e) => {
       })
     );
   }
+  // Everything else: pass through untouched (no stale caching).
 });
 
 function shouldBlockRequest(url) {

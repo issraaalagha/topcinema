@@ -27,8 +27,11 @@
   let castConnected = $state(false);
   let castDeviceName = $state('');
 
+  // Embedded-host mode: some servers only allow playback inside their own player iframe.
+  const isEmbedFrame = $derived(type === 'iframe');
+
   function initPlayer() {
-    if (!videoElement || !src) return;
+    if (!videoElement || !src || isEmbedFrame) return;
 
     // Destroy existing instances cleanly
     cleanup();
@@ -201,6 +204,7 @@
 
   $effect(() => {
     const currentSrc = src;
+    if (isEmbedFrame) return;
     if (currentSrc && videoElement) {
       untrack(() => {
         initPlayer();
@@ -219,6 +223,18 @@
 </script>
 
 <div class="enterprise-player-wrapper">
+  {#if isEmbedFrame}
+    <!-- Embedded host player (used when direct extraction is blocked upstream) -->
+    <iframe
+      class="embed-frame"
+      {src}
+      title={title || 'مشغل الفيديو'}
+      allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+      allowfullscreen
+      referrerpolicy="origin"
+      sandbox="allow-scripts allow-same-origin allow-presentation allow-forms allow-popups"
+    ></iframe>
+  {:else}
   <!-- Chromecast Floating Trigger Button -->
   {#if castAvailable}
     <button 
@@ -242,6 +258,7 @@
     playsinline
     preload="metadata"
   ></video>
+  {/if}
 </div>
 
 <style>
@@ -252,6 +269,14 @@
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75);
+  }
+
+  .embed-frame {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    background: #000;
   }
 
   /* ─────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 // Cloudflare Pages Edge Function for TopCinema API Proxy & Edge Caching
 
-const UPSTREAM_API = 'https://topcinemaa.co';
+const UPSTREAM_API = 'https://web.topcinemaa.live';
 
 export async function onRequest(context) {
   const { request, params, env } = context;

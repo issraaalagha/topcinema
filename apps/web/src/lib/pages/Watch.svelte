@@ -38,15 +38,10 @@
       api
         .post(currentId)
         .then((d) => {
-          // VIP Filtering: Strictly remove servers that enforce CORS/Proxy blocks. (NO IFRAME FALLBACK ALLOWED)
-          if (d.servers) {
-            d.servers = d.servers.filter(s => !/streamwish|filelions|dood|streamtape|lulu/i.test(s.name));
-          }
-          
           data = d;
           syncWatchlistStatus();
-          
-          // Auto-pick the highest-speed VIP server (VideoTube first for adaptive HLS, then UpDown)
+
+          // Auto-pick preferred server (VideoTube first for adaptive HLS, then UpDown)
           const preferred =
             d.servers?.find((s) => /vidtube|videotube/i.test(s.name)) ||
             d.servers?.find((s) => /updown/i.test(s.name)) ||
@@ -65,24 +60,34 @@
 
     try {
       const r = await api.resolve(id, srv.server);
-      
-      if (!r.ok || !r.url) {
-        resolveError = r.error || 'تعذر الحصول على رابط السيرفر';
+
+      // Hybrid strategy: clean HLS/MP4 when extraction succeeds,
+      // otherwise fall back to the host's own embed player.
+      if (r.ok && r.url) {
+        console.log('[Watch] Resolved Stream URL:', r.url);
+        stream = {
+          url: r.url,
+          type: r.type || (r.url.includes('.mp4') ? 'mp4' : 'hls'),
+          server: srv.name
+        };
         resolving = false;
         return;
       }
 
-      console.log('[Watch] Resolved Stream URL:', r.url);
-      
-      stream = {
-        url: r.url,
-        type: r.type || (r.url.includes('.mp4') ? 'mp4' : 'hls'),
-        server: srv.name
-      };
-      
+      const embedUrl = r.embedUrl || data?.post?.defaultEmbed || '';
+      if (embedUrl) {
+        stream = { url: embedUrl, type: 'iframe', server: srv.name };
+      } else {
+        resolveError = r.error || 'تعذر الحصول على رابط السيرفر';
+      }
     } catch (e) {
       console.error('[Watch] Error:', e);
-      resolveError = 'فشل معالجة رابط السيرفر: ' + e.message;
+      const embedUrl = data?.post?.defaultEmbed || '';
+      if (embedUrl) {
+        stream = { url: embedUrl, type: 'iframe', server: srv.name };
+      } else {
+        resolveError = 'فشل معالجة رابط السيرفر: ' + e.message;
+      }
     } finally {
       resolving = false;
     }
