@@ -119,15 +119,15 @@ export function parseCompositeId(id) {
 }
 
 /**
- * CineSrc embed URL from TMDB coordinates.
+ * CineSrc embed URL from TMDB coordinates (official docs format).
  * movie: https://cinesrc.st/embed/movie/{tmdbId}
- * tv:    https://cinesrc.st/embed/tv/{tmdbId}/{season}/{episode}
+ * tv:    https://cinesrc.st/embed/tv/{tmdbId}?s={season}&e={episode}
  */
 export function cineSrcEmbedUrl({ type, tmdbId, season, episode }) {
   if (type === 'tv') {
     const s = season || 1;
     const e = episode || 1;
-    return `https://cinesrc.st/embed/tv/${tmdbId}/${s}/${e}`;
+    return `https://cinesrc.st/embed/tv/${tmdbId}?s=${s}&e=${e}`;
   }
   return `https://cinesrc.st/embed/movie/${tmdbId}`;
 }

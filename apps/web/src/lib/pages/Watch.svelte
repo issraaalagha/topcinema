@@ -16,8 +16,60 @@
   let copied = $state(false);
   let resumeAt = $state(0);
   let failoverCount = $state(0);
+  let selectedSeason = $state(null);
+  let selectedEpisode = $state(null);
+  let episodes = $state([]);
+  let loadingEpisodes = $state(false);
 
   const PROGRESS_SAVE_INTERVAL = 15; // seconds
+
+  // Per-episode identity for TV: tv-108978-1-5 → resolve/history per episode
+  const isTv = $derived(data?.post?.type === 'tv');
+  const effectiveId = $derived(
+    isTv && selectedSeason && selectedEpisode
+      ? `tv-${data.post.tmdbId}-${selectedSeason}-${selectedEpisode}`
+      : id
+  );
+
+  function episodeLabel() {
+    return isTv && selectedSeason && selectedEpisode
+      ? ` — الموسم ${selectedSeason} الحلقة ${selectedEpisode}`
+      : '';
+  }
+
+  async function loadEpisodes(seasonNumber) {
+    if (!data?.post?.tmdbId) return;
+    loadingEpisodes = true;
+    episodes = [];
+    try {
+      const r = await api.getEpisodes(data.post.tmdbId, seasonNumber);
+      episodes = r.episodes || [];
+    } catch {
+      episodes = [];
+    } finally {
+      loadingEpisodes = false;
+    }
+  }
+
+  async function selectSeason(n) {
+    if (selectedSeason === n) return;
+    selectedSeason = n;
+    selectedEpisode = null;
+    await loadEpisodes(n);
+  }
+
+  async function selectEpisode(n) {
+    selectedEpisode = n;
+    resumeAt = 0;
+    // Restore this episode's saved position if any
+    try {
+      const h = await api.getHistory();
+      const hit = (h.items || []).find((i) => i.id === effectiveId);
+      resumeAt = hit && hit.currentTime > 30 ? hit.currentTime : 0;
+    } catch {}
+    const srv = selectedServer || data?.servers?.[0];
+    if (srv) pick(srv);
+  }
 
   function syncWatchlistStatus() {
     if (id) inList = isInWatchlist(id);
@@ -45,25 +97,55 @@
           data = d;
           syncWatchlistStatus();
 
-          // Restore last playback position BEFORE mounting the player so the
-          // embed URL carries the resume timestamp on first load.
-          try {
-            const h = await api.getHistory();
-            const hit = (h.items || []).find((i) => i.id === currentId);
-            if (hit && hit.currentTime > 30) resumeAt = hit.currentTime;
-          } catch {}
-
-          // Auto-pick preferred server (CineSrc 1080p first, then legacy)
           const preferred =
             d.servers?.find((s) => /cinesrc/i.test(s.name)) ||
             d.servers?.find((s) => /vidtube|videotube/i.test(s.name)) ||
             d.servers?.find((s) => /updown/i.test(s.name)) ||
             d.servers?.[0];
+
+          // TV: pick season/episode (history first, else S1E1) before playing
+          if (d.post.type === 'tv' && d.post.seasons?.length) {
+            let histS = null, histE = null;
+            try {
+              const h = await api.getHistory();
+              const items = h.items || [];
+              const lastEp = items.find(
+                (i) => typeof i.id === 'string' && i.id.startsWith(`tv-${d.post.tmdbId}-`)
+              );
+              if (lastEp) {
+                const parts = lastEp.id.split('-');
+                histS = parseInt(parts[2], 10);
+                histE = parseInt(parts[3], 10);
+              }
+              const base = items.find((i) => i.id === currentId);
+              const resumeSrc = lastEp || base;
+              if (resumeSrc && resumeSrc.currentTime > 30) resumeAt = resumeSrc.currentTime;
+            } catch {}
+
+            const validSeason = d.post.seasons.find((s) => s.number === histS);
+            await selectSeason(histS && validSeason ? histS : d.post.seasons[0].number);
+            selectedEpisode = histE || episodes[0]?.number || 1;
+          } else {
+            // Movie: restore last playback position before mounting the player
+            try {
+              const h = await api.getHistory();
+              const hit = (h.items || []).find((i) => i.id === currentId);
+              if (hit && hit.currentTime > 30) resumeAt = hit.currentTime;
+            } catch {}
+          }
+
           if (preferred) pick(preferred);
         })
         .catch((e) => (error = e.message));
     });
   });
+
+  function fallbackEmbedUrl() {
+    if (isTv && selectedSeason && selectedEpisode) {
+      return `https://cinesrc.st/embed/tv/${data.post.tmdbId}?s=${selectedSeason}&e=${selectedEpisode}`;
+    }
+    return data?.post?.defaultEmbed || '';
+  }
 
   async function pick(srv, isAutoFailover = false) {
     selectedServer = srv;
@@ -73,7 +155,7 @@
     if (!isAutoFailover) failoverCount = 0;
 
     try {
-      const r = await api.resolve(id, srv.server);
+      const r = await api.resolve(effectiveId, effectiveId);
 
       // Hybrid strategy: clean HLS/MP4 when extraction succeeds,
       // otherwise fall back to the host's own embed player.
@@ -88,7 +170,7 @@
         return;
       }
 
-      const embedUrl = r.embedUrl || data?.post?.defaultEmbed || '';
+      const embedUrl = r.embedUrl || fallbackEmbedUrl();
       if (embedUrl) {
         stream = { url: embedUrl, type: 'iframe', server: srv.name };
       } else {
@@ -96,7 +178,7 @@
       }
     } catch (e) {
       console.error('[Watch] Error:', e);
-      const embedUrl = data?.post?.defaultEmbed || '';
+      const embedUrl = fallbackEmbedUrl();
       if (embedUrl) {
         stream = { url: embedUrl, type: 'iframe', server: srv.name };
       } else {
@@ -116,8 +198,8 @@
 
     api
       .saveProgress({
-        id,
-        title: data.post.title,
+        id: effectiveId,
+        title: data.post.title + episodeLabel(),
         poster: data.post.poster,
         quality: data.post.quality,
         currentTime,
@@ -221,6 +303,48 @@
           </div>
         {/if}
       </div>
+
+      <!-- Episodes (TV only) -->
+      {#if isTv && data.post.seasons?.length}
+        <div class="episodes-section">
+          <div class="episodes-header">
+            <span class="episodes-title">الحلقات 🎞️</span>
+            {#if !loadingEpisodes && episodes.length}
+              <span class="episodes-hint">{episodes.length} حلقة في الموسم {selectedSeason}</span>
+            {/if}
+          </div>
+          <div class="seasons-row">
+            {#each data.post.seasons as s (s.number)}
+              <button
+                type="button"
+                class="season-btn"
+                class:active={selectedSeason === s.number}
+                onclick={() => selectSeason(s.number)}
+              >
+                {s.number === 0 ? 'حلقات خاصة' : `الموسم ${s.number}`}
+              </button>
+            {/each}
+          </div>
+          {#if loadingEpisodes}
+            <div class="episodes-loading"><div class="loader small"></div></div>
+          {:else}
+            <div class="episodes-list">
+              {#each episodes as ep (ep.number)}
+                <button
+                  type="button"
+                  class="episode-btn"
+                  class:active={selectedEpisode === ep.number}
+                  onclick={() => selectEpisode(ep.number)}
+                  title={ep.name}
+                >
+                  <span class="ep-num">{ep.number}</span>
+                  <span class="ep-name">{ep.name}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
 
       <!-- Server Switcher Bar -->
       <div class="servers-section">
@@ -455,6 +579,108 @@
   .subtitle-download:hover {
     background: rgba(16, 185, 129, 0.22);
     transform: translateY(-1px);
+  }
+  .episodes-section {
+    margin-top: 20px;
+    padding: 18px 20px;
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-glass);
+  }
+  .episodes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .episodes-title {
+    font-weight: 700;
+    font-size: 14.5px;
+    color: var(--text);
+  }
+  .episodes-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .seasons-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .season-btn {
+    padding: 7px 15px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .season-btn:hover {
+    color: var(--text);
+    border-color: var(--border-hover);
+  }
+  .season-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 3px 10px var(--accent-glow);
+  }
+  .episodes-loading {
+    display: flex;
+    justify-content: center;
+    padding: 18px 0;
+  }
+  .episodes-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .episode-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    padding: 7px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .episode-btn:hover {
+    color: var(--text);
+    border-color: var(--border-hover);
+    transform: translateY(-1px);
+  }
+  .episode-btn.active {
+    border-color: var(--accent);
+    color: #fff;
+    background: rgba(229, 9, 20, 0.18);
+  }
+  .ep-num {
+    min-width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    font-weight: 800;
+    font-size: 11.5px;
+  }
+  .episode-btn.active .ep-num {
+    background: var(--accent);
+  }
+  .ep-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
   }
   .info-col {
     background: var(--bg-surface);

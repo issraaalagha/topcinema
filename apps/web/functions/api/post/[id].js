@@ -58,12 +58,22 @@ export async function onRequest(context) {
 
     const embedUrl = cineSrcEmbedUrl(parsed);
 
+    // TV shows: expose the season list (episode counts) for the episodes UI
+    const seasons = (details.seasons || [])
+      .filter((s) => (s.episode_count || 0) > 0)
+      .map((s) => ({
+        number: s.season_number,
+        name: s.name || `الموسم ${s.season_number}`,
+        episodeCount: s.episode_count,
+      }));
+
     const post = {
       id: parsed.raw,
       tmdbId: parsed.tmdbId,
       type: parsed.type,
       season: parsed.season,
       episode: parsed.episode,
+      seasons,
       title,
       poster: imgUrl(details.poster_path, 'w500'),
       backdrop: imgUrl(details.backdrop_path, 'w780'),

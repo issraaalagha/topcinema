@@ -44,6 +44,7 @@ export const api = {
   },
   post: (id) => request(`${BASE}/post/${encodeURIComponent(id)}`),
   resolve: (id, server) => request(`${BASE}/resolve/${encodeURIComponent(id)}/${encodeURIComponent(server)}?_cb=${Date.now()}`),
+  getEpisodes: (tmdbId, season) => request(`${BASE}/episodes/${tmdbId}/${season}`),
 
   // Auth
   login: async (passcode, remember = true) => {
