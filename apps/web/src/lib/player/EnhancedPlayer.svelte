@@ -296,7 +296,6 @@
       src={embedSrc}
       title={title || 'مشغل الفيديو'}
       allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-      allowfullscreen
       referrerpolicy="origin"
       sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
     ></iframe>
