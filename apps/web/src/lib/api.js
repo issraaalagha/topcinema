@@ -47,10 +47,15 @@ export const api = {
   getEpisodes: (tmdbId, season) => request(`${BASE}/episodes/${tmdbId}/${season}`),
 
   // Auth
-  login: async (passcode, remember = true) => {
+  login: async (identifier, secret, remember = true) => {
+    // Accepts {username, password} or {passcode}
+    const payload =
+      typeof identifier === 'object' && identifier !== null
+        ? { ...identifier, remember }
+        : { passcode: identifier, remember };
     const data = await request(`${BASE}/auth/login`, {
       method: 'POST',
-      body: JSON.stringify({ passcode, remember }),
+      body: JSON.stringify(payload),
     });
     if (data.token) setAuthToken(data.token);
     return data;
@@ -60,6 +65,16 @@ export const api = {
     setAuthToken(null);
     return request(`${BASE}/auth/logout`, { method: 'POST' }).catch(() => ({ ok: true }));
   },
+
+  // Admin — users management (owner/admin roles)
+  listUsers: () => request(`${BASE}/auth/users`),
+  createUser: (u) =>
+    request(`${BASE}/auth/users`, { method: 'POST', body: JSON.stringify(u) }),
+  updateUser: (u) =>
+    request(`${BASE}/auth/users`, { method: 'PATCH', body: JSON.stringify(u) }),
+  deleteUser: (id) =>
+    request(`${BASE}/auth/users?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  getStats: () => request(`${BASE}/auth/stats`),
 
   // Cloud D1 Favorites (Categorized)
   getFavorites: (type = '', profile = 'default') => {

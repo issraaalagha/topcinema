@@ -1,19 +1,20 @@
 <script>
   import Home from './lib/pages/Home.svelte';
   import Watch from './lib/pages/Watch.svelte';
-  import PasscodeGate from './lib/components/PasscodeGate.svelte';
+  import Admin from './lib/pages/Admin.svelte';
+  import Login from './lib/components/Login.svelte';
   import { getWatchlist, syncFromCloud } from './lib/store.js';
   import { api, getAuthToken } from './lib/api.js';
 
   function getCurrentLocation() {
     if (typeof window === 'undefined') return { path: '/', search: '' };
-    
+
     // Auto upgrade legacy hash urls (e.g., /#/watch/xyz -> /watch/xyz)
     if (window.location.hash && window.location.hash.startsWith('#/')) {
       const cleanPath = window.location.hash.slice(1);
       window.history.replaceState(null, '', cleanPath);
     }
-    
+
     return {
       path: window.location.pathname || '/',
       search: window.location.search || ''
@@ -23,8 +24,10 @@
   let currentLoc = $state(getCurrentLocation());
   let isScrolled = $state(false);
   let watchlistCount = $state(0);
-  let isAuthenticated = $state(true);
-  let checkingAuth = $state(false);
+  let isAuthenticated = $state(!!getAuthToken());
+  let userRole = $state(localStorage.getItem('tc_role') || 'viewer');
+  let username = $state(localStorage.getItem('tc_username') || '');
+  let checkingAuth = $state(!!getAuthToken());
 
   function syncWatchlist() {
     watchlistCount = getWatchlist().length;
@@ -37,10 +40,40 @@
   });
 
   $effect(() => {
-    // Temporary bypass: Always authenticated for open testing
-    isAuthenticated = true;
-    checkingAuth = false;
-    syncFromCloud();
+    // Verify the saved token against the server (also refreshes role/username)
+    if (getAuthToken()) {
+      api
+        .verifyAuth()
+        .then((res) => {
+          if (res.authenticated) {
+            isAuthenticated = true;
+            userRole = res.role || 'viewer';
+            username = res.username || '';
+            localStorage.setItem('tc_role', userRole);
+            localStorage.setItem('tc_username', username);
+            syncFromCloud();
+          } else {
+            isAuthenticated = false;
+            api.logout();
+          }
+        })
+        .catch(() => {
+          isAuthenticated = !!getAuthToken();
+        })
+        .finally(() => {
+          checkingAuth = false;
+        });
+    } else {
+      checkingAuth = false;
+    }
+
+    const handleUnauthorized = () => {
+      isAuthenticated = false;
+      localStorage.removeItem('tc_role');
+      localStorage.removeItem('tc_username');
+    };
+    window.addEventListener('topcinema-unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('topcinema-unauthorized', handleUnauthorized);
   });
 
   $effect(() => {
@@ -90,17 +123,33 @@
     const watchMatch = p.match(/^\/watch\/(.+)/);
     if (watchMatch) return { page: 'watch', id: decodeURIComponent(watchMatch[1].split('?')[0]) };
     if (p === '/watchlist') return { page: 'home', tab: 'watchlist' };
+    if (p === '/admin') return { page: 'admin' };
     return { page: 'home', tab: 'all' };
   });
 
-  function handleAuthenticated() {
+  const isAdminRoute = $derived(route.page === 'admin');
+  const canAdmin = $derived(userRole === 'owner' || userRole === 'admin');
+
+  function handleAuthenticated(res) {
     isAuthenticated = true;
+    if (res?.role) {
+      userRole = res.role;
+      localStorage.setItem('tc_role', res.role);
+    }
+    if (res?.username) {
+      username = res.username;
+      localStorage.setItem('tc_username', res.username);
+    }
     syncFromCloud();
   }
 
   async function handleLogout() {
     await api.logout();
     isAuthenticated = false;
+    localStorage.removeItem('tc_role');
+    localStorage.removeItem('tc_username');
+    if (isAdminRoute) window.history.pushState(null, '', '/');
+    currentLoc = getCurrentLocation();
   }
 </script>
 
@@ -132,6 +181,11 @@
       </a>
 
       {#if isAuthenticated}
+        {#if canAdmin}
+          <a href="/admin" class="admin-btn {isAdminRoute ? 'active' : ''}" title="لوحة التحكم">
+            ⚙️
+          </a>
+        {/if}
         <button type="button" class="lock-btn" onclick={handleLogout} title="قفل المنصة وتسجيل الخروج" aria-label="قفل المنصة">
           🔒
         </button>
@@ -141,14 +195,23 @@
 </header>
 
 <main>
-  {#if isAuthenticated}
-    {#if route.page === 'home'}
-      <Home initialTab={route.tab} />
-    {:else if route.page === 'watch'}
-      <Watch id={route.id} />
+  {#if !isAuthenticated}
+    {#if !checkingAuth}
+      <Login onAuthenticated={handleAuthenticated} />
     {/if}
-  {:else if !checkingAuth}
-    <div class="auth-required-placeholder"></div>
+  {:else if isAdminRoute}
+    {#if canAdmin}
+      <Admin role={userRole} {username} />
+    {:else}
+      <div class="admin-denied">
+        <p>🔒 لوحة التحكم متاحة للمشرفين فقط</p>
+        <a href="/" class="back-home">العودة للرئيسية</a>
+      </div>
+    {/if}
+  {:else if route.page === 'home'}
+    <Home initialTab={route.tab} />
+  {:else if route.page === 'watch'}
+    <Watch id={route.id} />
   {/if}
 </main>
 
@@ -292,6 +355,38 @@
     background: rgba(239, 68, 68, 0.2);
     border-color: rgba(239, 68, 68, 0.4);
     transform: scale(1.08);
+  }
+  .admin-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-glass);
+    display: grid;
+    place-items: center;
+    font-size: 15px;
+    transition: all var(--transition-fast);
+  }
+  .admin-btn:hover,
+  .admin-btn.active {
+    border-color: rgba(229, 9, 20, 0.5);
+    background: rgba(229, 9, 20, 0.15);
+    transform: scale(1.08);
+  }
+  .admin-denied {
+    text-align: center;
+    padding: 100px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    color: var(--text-secondary);
+  }
+  .back-home {
+    padding: 10px 22px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
   }
   .app-footer {
     margin-top: 60px;

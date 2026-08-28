@@ -1,10 +1,10 @@
 /**
  * TopCinema Service Worker
  * Enterprise-grade caching + Ad blocking for iframe embeds
- * @version 3.0.0 — network-first navigation (stale-shell fix)
+ * @version 4.0.0 — hard reset (stale v2 shells were serving deleted bundles)
  */
 
-const CACHE = 'topcinema-v3';
+const CACHE = 'topcinema-v4';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon.svg'];
 
 // Ad blocking patterns

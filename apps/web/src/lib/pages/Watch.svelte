@@ -446,6 +446,25 @@
             <p class="story-text">{data.post.story}</p>
           </div>
         {/if}
+
+        {#if data.post.collection?.parts?.length > 1}
+          <div class="collection-section">
+            <h3>🎬 السلسلة: {data.post.collection.name}</h3>
+            <div class="collection-row">
+              {#each data.post.collection.parts as part (part.id)}
+                <a
+                  class="collection-item"
+                  class:current={part.isCurrent}
+                  href={'/watch/' + part.id}
+                >
+                  <img src={part.poster || '/icons/icon.svg'} alt={part.title} loading="lazy" />
+                  <span class="c-title">{part.title}</span>
+                  <span class="c-year">{part.year || '—'}</span>
+                </a>
+              {/each}
+            </div>
+          </div>
+        {/if}
       </div>
     </div>
   </div>
@@ -783,6 +802,61 @@
     font-size: 13.5px;
     color: var(--text-secondary);
     line-height: 1.7;
+  }
+  .collection-section {
+    border-top: 1px solid var(--border-glass);
+    padding-top: 14px;
+  }
+  .collection-section h3 {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .collection-row {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+  }
+  .collection-item {
+    flex: 0 0 86px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+  }
+  .collection-item img {
+    width: 86px;
+    height: 129px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    transition: all var(--transition-fast);
+  }
+  .collection-item:hover img {
+    transform: translateY(-2px);
+    border-color: var(--border-hover);
+  }
+  .collection-item.current img {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+  .c-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .collection-item.current .c-title {
+    color: var(--accent);
+  }
+  .c-year {
+    font-size: 10.5px;
+    color: var(--text-muted);
   }
   .watch-loading, .watch-error {
     text-align: center;

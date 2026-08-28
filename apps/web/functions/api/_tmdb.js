@@ -141,13 +141,16 @@ export async function tmdbDetails(env, type, id, append = '') {
 export function mapListItem(item, type) {
   const date = item.release_date || item.first_air_date || '';
   const year = date ? date.slice(0, 4) : '';
-  const genres = (item.genre_ids || [])
-    .map((gid) => GENRE_MAP_AR[gid])
-    .filter(Boolean);
+  const genreIds = item.genre_ids || [];
+  const genres = genreIds.map((gid) => GENRE_MAP_AR[gid]).filter(Boolean);
+  // Type badge: anime is animation-genre TV, everything TV-ish is a series
+  const kind =
+    type === 'movie' ? 'فيلم' : genreIds.includes(16) ? 'أنمي' : 'مسلسل';
   return {
     id: `${type}-${item.id}`,
     tmdbId: item.id,
     type,
+    kind,
     title: (item.title || item.name || '').trim(),
     poster: imgUrl(item.poster_path, 'w500'),
     backdrop: imgUrl(item.backdrop_path, 'w780'),

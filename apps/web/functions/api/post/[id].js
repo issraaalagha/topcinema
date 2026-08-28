@@ -58,6 +58,33 @@ export async function onRequest(context) {
 
     const embedUrl = cineSrcEmbedUrl(parsed);
 
+    // Franchise/collection parts (e.g. Avengers, Mission Impossible)
+    let collection = null;
+    if (details.belongs_to_collection?.id) {
+      try {
+        const col = await tmdbFetch(
+          env,
+          `/collection/${details.belongs_to_collection.id}`,
+          {},
+          'ar'
+        );
+        collection = {
+          id: col.id,
+          name: col.name || details.belongs_to_collection.name || '',
+          parts: (col.parts || [])
+            .filter((p) => p.release_date) // released parts only
+            .sort((a, b) => (a.release_date || '').localeCompare(b.release_date || ''))
+            .map((p) => ({
+              id: `movie-${p.id}`,
+              title: p.title || p.name || '',
+              poster: imgUrl(p.poster_path, 'w300'),
+              year: (p.release_date || '').slice(0, 4),
+              isCurrent: p.id === parsed.tmdbId,
+            })),
+        };
+      } catch {}
+    }
+
     // TV shows: expose the season list (episode counts) for the episodes UI
     const seasons = (details.seasons || [])
       .filter((s) => (s.episode_count || 0) > 0)
@@ -86,6 +113,7 @@ export async function onRequest(context) {
       imdb: details.vote_average ? String(Math.round(details.vote_average * 10) / 10) : '',
       imdbId: details.external_ids?.imdb_id || '',
       defaultEmbed: embedUrl,
+      collection,
       // Extra TMDB riches for the enhanced watch page
       tagline: details.tagline || '',
       cast: (details.credits?.cast || []).slice(0, 12).map((c) => ({

@@ -58,6 +58,10 @@
               height="225"
             />
 
+            {#if it.kind}
+              <span class="kind-badge kind-{it.type}">{it.kind}</span>
+            {/if}
+
             {#if it.quality}
               <span class="quality">{it.quality}</span>
             {/if}
@@ -206,6 +210,25 @@
     padding: 3px 7px;
     border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  .kind-badge {
+    position: absolute;
+    top: 8px;
+    inset-inline-end: 8px;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.3px;
+  }
+  .kind-movie {
+    background: rgba(229, 9, 20, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  .kind-tv {
+    background: rgba(37, 99, 235, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
   .imdb {
     position: absolute;
