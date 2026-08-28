@@ -51,8 +51,8 @@
   <div class="gate-backdrop"></div>
   <div class="gate-card {shake ? 'shake' : ''}">
     <div class="gate-header">
-      <div class="brand-logo">TC</div>
-      <h2>توب سينما 🔐</h2>
+      <img class="gate-logo" src="/icons/logo-mark.png" alt="FreeWatch" width="72" height="72" />
+      <h2 class="gate-wordmark">free<em>watch</em><span class="tld">.uk</span></h2>
       <p class="subtitle">منصة خاصة — الدخول متاح لحسابات المسجّلين فقط</p>
     </div>
 
@@ -145,18 +145,33 @@
     20%, 60% { transform: translateX(-9px); }
     40%, 80% { transform: translateX(9px); }
   }
-  .brand-logo {
-    width: 62px;
-    height: 62px;
-    margin: 0 auto 14px;
-    border-radius: 16px;
-    display: grid;
-    place-items: center;
+  .gate-logo {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 12px;
+    border-radius: 18px;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.6);
+  }
+  .gate-wordmark {
+    font-size: 26px;
     font-weight: 900;
-    font-size: 24px;
+    letter-spacing: -0.6px;
+    direction: ltr;
     color: #fff;
-    background: linear-gradient(135deg, #e50914, #7c0a10);
-    box-shadow: 0 10px 34px rgba(229, 9, 20, 0.45);
+    margin-bottom: 6px;
+  }
+  .gate-wordmark em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--accent, #e50914), #ff4d57);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .gate-wordmark .tld {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.45);
+    -webkit-text-fill-color: rgba(255, 255, 255, 0.45);
+    margin-inline-start: 4px;
   }
   h2 {
     font-size: 21px;

@@ -1,9 +1,9 @@
 <script>
   import { api } from '../api.js';
   import { getContinueWatching, getWatchlist, syncFromCloud } from '../store.js';
+  import { category, setCategory } from '../category.svelte.js';
   import Hero from '../components/Hero.svelte';
   import Row from '../components/Row.svelte';
-  import CategoryChips from '../components/CategoryChips.svelte';
   import SkeletonHero from '../components/SkeletonHero.svelte';
   import SkeletonRow from '../components/SkeletonRow.svelte';
 
@@ -16,15 +16,19 @@
   let error = $state('');
   let q = $state('');
   let results = $state(null);
-  let selectedCategory = $state('');
-  let watchlistCategory = $state('all');
   let searchTimer;
   let continueWatching = $state([]);
   let watchlist = $state([]);
+  let watchlistCategory = $state('all');
 
   function syncLocalData() {
     continueWatching = getContinueWatching();
     watchlist = getWatchlist(watchlistCategory);
+  }
+
+  function handleWatchlistFilter(type) {
+    watchlistCategory = type;
+    watchlist = getWatchlist(type);
   }
 
   $effect(() => {
@@ -43,15 +47,15 @@
       .catch(() => {});
   }
 
-  function loadHomeData(category = '') {
+  function loadHomeData(cat = '') {
     loading = true;
     error = '';
 
-    if (category) {
+    if (cat) {
       api
-        .catalog(1, category, '')
+        .catalog(1, cat, '')
         .then((d) => {
-          rows = [{ id: category, title: 'التصنيف المختار', items: d.items || [] }];
+          rows = [{ id: cat, title: 'التصنيف المختار', items: d.items || [] }];
           heroItems = (d.items || []).filter((i) => i.backdrop).slice(0, 5);
         })
         .catch((e) => (error = e.message))
@@ -74,19 +78,8 @@
   }
 
   $effect(() => {
-    loadHomeData(selectedCategory);
+    loadHomeData(category.value);
   });
-
-  function handleCategorySelect(catId) {
-    selectedCategory = catId;
-    q = '';
-    results = null;
-  }
-
-  function handleWatchlistFilter(type) {
-    watchlistCategory = type;
-    watchlist = getWatchlist(type);
-  }
 
   function onSearch() {
     clearTimeout(searchTimer);
@@ -97,7 +90,7 @@
     }
     searchTimer = setTimeout(async () => {
       try {
-        const d = await api.catalog(1, selectedCategory, term);
+        const d = await api.catalog(1, category.value, term);
         results = d.items || [];
       } catch {
         results = [];
@@ -137,7 +130,12 @@
   </div>
 
   {#if !results && initialTab !== 'watchlist'}
-    <CategoryChips selected={selectedCategory} onSelect={handleCategorySelect} />
+    {#if category.value}
+      <div class="cat-active-bar">
+        <span>تصنيف: <b>{category.value}</b></span>
+        <button type="button" onclick={() => setCategory('')}>✕ إلغاء التصنيف</button>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -200,7 +198,7 @@
     <div class="error-icon">⚠️</div>
     <h3>تعذر تحميل المحتوى</h3>
     <p>{error}</p>
-    <button type="button" class="retry-btn" onclick={() => loadHomeData(selectedCategory)}>
+    <button type="button" class="retry-btn" onclick={() => loadHomeData(category.value)}>
       إعادة المحاولة
     </button>
   </div>
@@ -227,7 +225,7 @@
   {/if}
 
   <!-- Personalized AI Recommendations Row -->
-  {#if recommendations?.items?.length && !selectedCategory}
+  {#if recommendations?.items?.length && !category.value}
     <Row title={recommendations.title} items={recommendations.items} />
   {/if}
 
@@ -292,6 +290,34 @@
   }
   .clear-btn:hover {
     background: rgba(255, 255, 255, 0.3);
+  }
+  .cat-active-bar {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 8px 22px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--text-secondary);
+    font-size: 13.5px;
+  }
+  .cat-active-bar b {
+    color: var(--accent);
+  }
+  .cat-active-bar button {
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border-glass);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cat-active-bar button:hover {
+    color: var(--text);
+    border-color: var(--border-hover);
   }
   .watchlist-header {
     max-width: 1440px;
@@ -408,7 +434,35 @@
       padding: 12px 40px 12px 40px;
       font-size: 14px;
     }
-    .watchlist-header {
+    .cat-active-bar {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 8px 22px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--text-secondary);
+    font-size: 13.5px;
+  }
+  .cat-active-bar b {
+    color: var(--accent);
+  }
+  .cat-active-bar button {
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border-glass);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cat-active-bar button:hover {
+    color: var(--text);
+    border-color: var(--border-hover);
+  }
+  .watchlist-header {
       padding: 10px 16px;
     }
   }

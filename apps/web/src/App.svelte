@@ -6,6 +6,7 @@
   import SearchOverlay from './lib/components/SearchOverlay.svelte';
   import { getWatchlist, syncFromCloud } from './lib/store.js';
   import { api, getAuthToken } from './lib/api.js';
+  import { category, setCategory } from './lib/category.svelte.js';
 
   function getCurrentLocation() {
     if (typeof window === 'undefined') return { path: '/', search: '' };
@@ -30,6 +31,34 @@
   let username = $state(localStorage.getItem('tc_username') || '');
   let checkingAuth = $state(!!getAuthToken());
   let searchOpen = $state(false);
+  let browseOpen = $state(false);
+  let moreOpen = $state(false);
+
+  // Netflix-style category navigation (shared state with Home)
+  const NAV_CATS = [
+    { id: 'movies', label: 'أفلام' },
+    { id: 'series', label: 'مسلسلات' },
+    { id: 'anime', label: 'أنمي' },
+    { id: 'action', label: 'أكشن' },
+    { id: 'horror', label: 'رعب' },
+  ];
+  const NAV_CATS_MORE = [
+    { id: 'comedy', label: 'كوميديا' },
+    { id: 'drama', label: 'دراما' },
+    { id: 'scifi', label: 'خيال علمي' },
+  ];
+  const ALL_CATS = [{ id: '', label: 'الرئيسية' }, ...NAV_CATS, ...NAV_CATS_MORE];
+
+  function isCatActive(id) {
+    return category.value === id && currentLoc.path === '/';
+  }
+
+  function pickCategory(id) {
+    setCategory(id);
+    moreOpen = false;
+    browseOpen = false;
+    if (currentLoc.path !== '/') navigateTo('/');
+  }
 
   function syncWatchlist() {
     watchlistCount = getWatchlist().length;
@@ -159,15 +188,72 @@
 
 <SearchOverlay open={searchOpen} onClose={() => (searchOpen = false)} />
 
+{#if browseOpen}
+  <div class="sheet-overlay" role="dialog" aria-modal="true" aria-label="تصفح التصنيفات">
+    <div class="sheet-backdrop" role="presentation" onclick={() => (browseOpen = false)}></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title">تصفح التصنيفات</h3>
+      <div class="sheet-list">
+        {#each ALL_CATS as c (c.id || 'home')}
+          <button
+            type="button"
+            class="sheet-item"
+            class:active={isCatActive(c.id)}
+            onclick={() => pickCategory(c.id)}
+          >
+            <span>{c.label}</span>
+            <span class="sheet-arrow">‹</span>
+          </button>
+        {/each}
+        <a href="/watchlist" class="sheet-item" onclick={() => (browseOpen = false)}>
+          <span>قائمتي {#if watchlistCount > 0}({watchlistCount}){/if}</span>
+          <span class="sheet-arrow">‹</span>
+        </a>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <header class="topbar {isScrolled ? 'scrolled' : ''}">
   <div class="topbar-inner">
-    <a href="/" class="brand" aria-label="توب سينما الرئيسية">
-      <span class="brand-mark">TC</span>
-      <span class="brand-name">توب سينما</span>
+    <a href="/" class="brand" aria-label="FreeWatch الرئيسية">
+      <img class="brand-mark-img" src="/icons/logo-mark.png" alt="FreeWatch" width="38" height="38" />
+      <span class="brand-wordmark">free<em>watch</em></span>
     </a>
 
     <nav class="nav-links" aria-label="القائمة الرئيسية">
-      <a href="/" class="nav-link {currentLoc.path === '/' ? 'active' : ''}">الرئيسية</a>
+      <a href="/" class="nav-link {currentLoc.path === '/' && !category.value ? 'active' : ''}">الرئيسية</a>
+
+      {#each NAV_CATS as c (c.id)}
+        <button
+          type="button"
+          class="nav-link cat-desktop {isCatActive(c.id) ? 'active' : ''}"
+          onclick={() => pickCategory(c.id)}
+        >
+          {c.label}
+        </button>
+      {/each}
+
+      <details class="more cat-desktop" bind:open={moreOpen}>
+        <summary class="nav-link">المزيد ▾</summary>
+        <div class="more-menu">
+          {#each NAV_CATS_MORE as c (c.id)}
+            <button type="button" class:active={isCatActive(c.id)} onclick={() => pickCategory(c.id)}>
+              {c.label}
+            </button>
+          {/each}
+        </div>
+      </details>
+
+      <button
+        type="button"
+        class="nav-link cat-mobile {browseOpen ? 'active' : ''}"
+        onclick={() => (browseOpen = !browseOpen)}
+      >
+        تصفح ▾
+      </button>
+
       <a href="/watchlist" class="nav-link {currentLoc.path === '/watchlist' ? 'active' : ''}">
         <span>قائمتي</span>
         {#if watchlistCount > 0}
@@ -234,23 +320,27 @@
 <footer class="app-footer">
   <div class="footer-content">
     <div class="footer-brand">
-      <span class="brand-mark sm">TC</span>
-      <span class="footer-title">توب سينما — TopCinema</span>
+      <img class="footer-logo" src="/icons/logo-mark.png" alt="FreeWatch" width="34" height="34" />
+      <span class="footer-title">FreeWatch — freewatch.uk</span>
     </div>
     <p class="footer-disclaimer">
       منصة لمشاهدة الأفلام والمسلسلات بجودة عالية وبدون إعلانات مزعجة • محمي بسحابة Cloudflare D1 🛡️
     </p>
-    <p class="footer-copy">© 2026 توب سينما. جميع الحقوق محفوظة.</p>
+    <p class="footer-copy">© 2026 FreeWatch. جميع الحقوق محفوظة.</p>
   </div>
 </footer>
 
 <style>
+  :global(html),
+  :global(body) {
+    overflow-x: clip; /* kill any accidental horizontal wobble */
+  }
   .topbar {
     position: sticky;
     top: 0;
     z-index: 100;
     width: 100%;
-    padding: 14px 24px;
+    padding: 12px 18px;
     background: transparent;
     transition: background var(--transition-normal), backdrop-filter var(--transition-normal), border-color var(--transition-normal);
     border-bottom: 1px solid transparent;
@@ -273,55 +363,122 @@
     align-items: center;
     gap: 10px;
   }
-  .brand-mark {
+  .brand-mark-img {
     width: 38px;
     height: 38px;
-    border-radius: var(--radius-sm);
-    background: linear-gradient(135deg, var(--accent), #b20710);
-    color: #fff;
+    border-radius: 11px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    transition: transform var(--transition-fast);
+  }
+  .brand:hover .brand-mark-img {
+    transform: scale(1.06);
+  }
+  /* Typographic wordmark — Netflix-style brand */
+  .brand-wordmark {
+    font-size: 24px;
     font-weight: 900;
-    font-size: 16px;
-    display: grid;
-    place-items: center;
-    box-shadow: 0 4px 14px var(--accent-glow);
+    letter-spacing: -0.8px;
+    line-height: 1;
+    direction: ltr;
+    color: #fff;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
   }
-  .brand-mark.sm {
-    width: 30px;
-    height: 30px;
-    font-size: 13px;
-  }
-  .brand-name {
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    background: linear-gradient(to right, #fff, var(--text-secondary));
+  .brand-wordmark em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--accent), #ff4d57);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
   }
   .nav-links {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
   }
   .nav-link {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 16px;
-    border-radius: var(--radius-pill);
-    font-size: 14px;
+    padding: 8px 13px;
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
     font-weight: 600;
     color: var(--text-secondary);
-    transition: all var(--transition-fast);
+    background: transparent;
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    transition: color var(--transition-fast), background var(--transition-fast);
   }
   .nav-link:hover {
     color: var(--text);
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.07);
   }
+  /* Netflix-style active: white text + red underline bar */
   .nav-link.active {
     color: #fff;
-    background: var(--bg-surface);
+    background: transparent;
+    font-weight: 800;
+  }
+  .nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 12px;
+    right: 12px;
+    height: 2.5px;
+    border-radius: 3px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+  .more {
+    position: relative;
+  }
+  .more summary {
+    list-style: none;
+  }
+  .more summary::-webkit-details-marker {
+    display: none;
+  }
+  .more-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    inset-inline-start: 0;
+    min-width: 160px;
+    background: rgba(16, 18, 24, 0.97);
     border: 1px solid var(--border-glass);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    z-index: 60;
+  }
+  .more-menu button {
+    padding: 10px 14px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13.5px;
+    font-weight: 600;
+    text-align: start;
+    cursor: pointer;
+  }
+  .more-menu button:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+  }
+  .more-menu button.active {
+    color: var(--accent);
+    font-weight: 800;
+  }
+  .cat-mobile {
+    display: none;
   }
   .count-badge {
     padding: 2px 7px;
@@ -441,21 +598,123 @@
 
   @media (max-width: 768px) {
     .topbar {
-      padding: 10px 16px;
+      padding: 10px 12px;
+    }
+    .topbar-inner {
+      gap: 6px;
+    }
+    .brand-mark-img {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+    }
+    .brand-wordmark {
+      font-size: 19px;
+    }
+    .nav-links {
+      gap: 0;
+    }
+    .nav-link {
+      padding: 8px 9px;
+      font-size: 12.5px;
+    }
+    .cat-desktop {
+      display: none;
+    }
+    .cat-mobile {
+      display: inline-flex;
+    }
+    .header-actions {
+      gap: 6px;
+    }
+    .search-nav-btn {
+      padding: 8px;
     }
     .search-nav-text {
       display: none;
     }
-    .search-nav-btn {
-      padding: 8px;
-      border-radius: 50%;
+    .admin-btn,
+    .lock-btn {
+      width: 34px;
+      height: 34px;
     }
-    .brand-name {
-      font-size: 17px;
+  }
+
+  /* ── Mobile browse bottom-sheet ── */
+  .sheet-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+  }
+  .sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+  }
+  .sheet {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 78svh;
+    overflow-y: auto;
+    background: rgba(16, 18, 24, 0.98);
+    border-radius: 22px 22px 0 0;
+    border-top: 1px solid var(--border-glass);
+    padding: 10px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+    animation: sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+    overscroll-behavior: contain;
+  }
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
     }
-    .nav-link {
-      padding: 6px 12px;
-      font-size: 13px;
+    to {
+      transform: translateY(0);
     }
+  }
+  .sheet-handle {
+    width: 44px;
+    height: 4px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 6px auto 14px;
+  }
+  .sheet-title {
+    font-size: 15px;
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+  .sheet-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .sheet-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 10px;
+    border: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .sheet-item:hover,
+  .sheet-item.active {
+    color: var(--text);
+  }
+  .sheet-item.active {
+    color: var(--accent);
+    font-weight: 800;
+  }
+  .sheet-arrow {
+    color: var(--text-muted);
+    font-size: 18px;
   }
 </style>
