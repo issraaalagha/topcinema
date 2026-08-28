@@ -5,6 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="referrer" content="no-referrer" />
     <title>توب سينما | TopCinema</title>
+    <script>
+      // Self-heal watchdog: if the app shell fails to mount (stale Service
+      // Worker serving deleted hashed bundles), unregister workers, purge
+      // caches, and reload once per session.
+      (function () {
+        setTimeout(function () {
+          if (window.__TC_MOUNTED__) return;
+          if (sessionStorage.getItem('tc_selfheal')) return;
+          sessionStorage.setItem('tc_selfheal', '1');
+          var cleanup = Promise.resolve();
+          if ('caches' in window) {
+            cleanup = caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            }).catch(function () {});
+          }
+          cleanup.then(function () {
+            if (navigator.serviceWorker) {
+              return navigator.serviceWorker.getRegistrations().then(function (regs) {
+                return Promise.all(regs.map(function (r) { return r.unregister(); }));
+              }).catch(function () {});
+            }
+          }).then(function () { location.reload(); });
+        }, 4000);
+      })();
+    </script>
     <meta name="theme-color" content="#0b0d12" />
     <meta name="description" content="توب سينما — مشاهدة الأفلام والمسلسلات بسرعة وبدون إعلانات" />
     <link rel="manifest" href="/manifest.webmanifest" />
