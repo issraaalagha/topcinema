@@ -255,14 +255,18 @@
   async function handleCast() {
     if (!src) return;
     try {
-      await castManager.requestSession();
+      await castManager.initialize();
       const castUrl = src.startsWith('http') ? src : `${window.location.origin}${src}`;
       await castManager.castMedia(castUrl, {
-        title: title || 'توب سينما',
+        title: title || 'FreeWatch',
         poster: poster || '',
         currentTime: player?.currentTime || 0,
-        isHls: src.includes('.m3u8')
+        subtitleUrl: subtitleUrl
+          ? (subtitleUrl.startsWith('http') ? subtitleUrl : `${window.location.origin}${subtitleUrl}`)
+          : ''
       });
+      // Local playback hands off to the TV
+      player?.pause?.();
     } catch (err) {
       console.warn('[Cast] Failed:', err);
     }

@@ -159,7 +159,7 @@ class CastManager {
    * @param {number} options.currentTime - Start time in seconds
    * @returns {Promise<void>}
    */
-  async cast({ url, title = '', poster = '', currentTime = 0 }) {
+  async cast({ url, title = '', poster = '', currentTime = 0, subtitleUrl = '' }) {
     if (!this.available) {
       throw new Error('Chromecast not available');
     }
@@ -197,6 +197,23 @@ class CastManager {
       request.currentTime = currentTime;
       request.autoplay = true;
 
+      // Arabic subtitle track — best-effort only: a rejected track must
+      // never break the cast itself.
+      if (subtitleUrl) {
+        try {
+          const sub = new cast.media.Track(1, cast.media.TrackType.TEXT);
+          sub.trackContentId = subtitleUrl;
+          sub.trackContentType = 'text/vtt';
+          sub.subtype = cast.media.TextTrackType.SUBTITLES;
+          sub.name = 'العربية';
+          sub.language = 'ar';
+          mediaInfo.tracks = [sub];
+          request.activeTrackIds = [1];
+        } catch (subErr) {
+          console.warn('[CastManager] Subtitle track skipped:', subErr);
+        }
+      }
+
       // Load media
       const session = cast.framework.CastContext.getInstance().getCurrentSession();
       await session.loadMedia(request);
@@ -216,6 +233,41 @@ class CastManager {
       this.emit('error', error);
       throw error;
     }
+  }
+
+  /**
+   * Ensure a cast session exists (initializes framework on first use)
+   * @returns {Promise<Object>} the active session
+   */
+  async requestSession() {
+    await this.initialize();
+    if (this.session) return this.session;
+
+    const cast = window.chrome.cast;
+    const context = cast.framework.CastContext.getInstance();
+    await context.requestSession();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    this.session = context.getCurrentSession();
+    if (!this.session) {
+      throw new Error('Failed to establish cast session');
+    }
+    return this.session;
+  }
+
+  /**
+   * Legacy-compatible alias used by EnhancedPlayer
+   * @param {string} url
+   * @param {Object} options
+   */
+  async castMedia(url, options = {}) {
+    return this.cast({
+      url,
+      title: options.title,
+      poster: options.poster,
+      currentTime: options.currentTime || 0,
+      subtitleUrl: options.subtitleUrl || '',
+    });
   }
 
   /**

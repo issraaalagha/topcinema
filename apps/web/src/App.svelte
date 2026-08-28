@@ -2,6 +2,7 @@
   import Home from './lib/pages/Home.svelte';
   import Watch from './lib/pages/Watch.svelte';
   import Admin from './lib/pages/Admin.svelte';
+  import TV from './lib/pages/TV.svelte';
   import Login from './lib/components/Login.svelte';
   import SearchOverlay from './lib/components/SearchOverlay.svelte';
   import { getWatchlist, syncFromCloud } from './lib/store.js';
@@ -155,6 +156,7 @@
     if (watchMatch) return { page: 'watch', id: decodeURIComponent(watchMatch[1].split('?')[0]) };
     if (p === '/watchlist') return { page: 'home', tab: 'watchlist' };
     if (p === '/admin') return { page: 'admin' };
+    if (p === '/tv') return { page: 'tv' };
     return { page: 'home', tab: 'all' };
   });
 
@@ -215,6 +217,7 @@
   </div>
 {/if}
 
+{#if route.page !== 'tv'}
 <header class="topbar {isScrolled ? 'scrolled' : ''}">
   <div class="topbar-inner">
     <a href="/" class="brand" aria-label="FreeWatch الرئيسية">
@@ -294,9 +297,10 @@
     </div>
   </div>
 </header>
+{/if}
 
 <main>
-  {#if !isAuthenticated}
+  {#if !isAuthenticated && route.page !== 'tv'}
     {#if !checkingAuth}
       <Login onAuthenticated={handleAuthenticated} />
     {/if}
@@ -309,6 +313,8 @@
         <a href="/" class="back-home">العودة للرئيسية</a>
       </div>
     {/if}
+  {:else if route.page === 'tv'}
+    <TV />
   {:else if route.page === 'home'}
     <Home initialTab={route.tab} />
   {:else if route.page === 'watch'}
@@ -316,6 +322,7 @@
   {/if}
 </main>
 
+{#if route.page !== 'tv'}
 <footer class="app-footer">
   <div class="footer-content">
     <div class="footer-brand">
@@ -328,6 +335,7 @@
     <p class="footer-copy">© 2026 FreeWatch. جميع الحقوق محفوظة.</p>
   </div>
 </footer>
+{/if}
 
 <style>
   :global(html),
