@@ -218,8 +218,7 @@
 <header class="topbar {isScrolled ? 'scrolled' : ''}">
   <div class="topbar-inner">
     <a href="/" class="brand" aria-label="FreeWatch الرئيسية">
-      <img class="brand-mark-img" src="/icons/logo-mark.png" alt="FreeWatch" width="38" height="38" />
-      <span class="brand-wordmark">free<em>watch</em></span>
+      <img class="brand-mark-img" src="/icons/logo-mark.png" alt="FreeWatch" width="40" height="40" />
     </a>
 
     <nav class="nav-links" aria-label="القائمة الرئيسية">
@@ -372,23 +371,6 @@
   }
   .brand:hover .brand-mark-img {
     transform: scale(1.06);
-  }
-  /* Typographic wordmark — Netflix-style brand */
-  .brand-wordmark {
-    font-size: 24px;
-    font-weight: 900;
-    letter-spacing: -0.8px;
-    line-height: 1;
-    direction: ltr;
-    color: #fff;
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
-  }
-  .brand-wordmark em {
-    font-style: normal;
-    background: linear-gradient(135deg, var(--accent), #ff4d57);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
   }
   .nav-links {
     display: flex;
@@ -601,21 +583,18 @@
       padding: 10px 12px;
     }
     .topbar-inner {
-      gap: 6px;
+      gap: 9px;
     }
     .brand-mark-img {
-      width: 32px;
-      height: 32px;
-      border-radius: 9px;
-    }
-    .brand-wordmark {
-      font-size: 19px;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
     }
     .nav-links {
       gap: 0;
     }
     .nav-link {
-      padding: 8px 9px;
+      padding: 8px 8px;
       font-size: 12.5px;
     }
     .cat-desktop {
