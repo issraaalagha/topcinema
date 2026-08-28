@@ -111,11 +111,41 @@ export async function tmdbFetch(env, path, params = {}, language = 'ar') {
  * Both fetches are edge-cached, so the dual-language merge costs TMDB
  * nothing on repeat views.
  */
+// Untranslated Arabic responses return the ORIGINAL name (e.g. Japanese)
+const CJK_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
+export function hasCJK(str) {
+  return CJK_RE.test(str || '');
+}
+
+/**
+ * Merge a language='ar' list with its language='en' twin by TMDB id.
+ * Keeps the Arabic title unless it is untranslated CJK.
+ */
+export function mergeListTitles(arResults = [], enResults = []) {
+  const enById = new Map(enResults.map((r) => [r.id, r]));
+  return arResults.map((item) => {
+    const en = enById.get(item.id);
+    if (!en) return item;
+    const arTitle = item.title || item.name || '';
+    if (!arTitle || hasCJK(arTitle)) {
+      return { ...item, title: en.title || en.name || arTitle };
+    }
+    return item;
+  });
+}
+
 export async function tmdbDetails(env, type, id, append = '') {
   const [en, ar] = await Promise.all([
     tmdbFetch(env, `/${type}/${id}`, append ? { append_to_response: append } : {}, 'en'),
     tmdbFetch(env, `/${type}/${id}`, append ? { append_to_response: append } : {}, 'ar').catch(() => ({})),
   ]);
+
+  // If the "Arabic" title is untranslated CJK (common for anime), prefer English
+  const arTitle = ar.title || ar.name || '';
+  const bestTitle =
+    arTitle && !hasCJK(arTitle)
+      ? arTitle
+      : en.title || en.name || arTitle;
 
   return {
     ...en,
@@ -125,10 +155,7 @@ export async function tmdbDetails(env, type, id, append = '') {
       )
     ),
     overview: (ar.overview && ar.overview.trim()) || en.overview || '',
-    title:
-      (ar.title || ar.name) && (ar.title || ar.name).trim()
-        ? ar.title || ar.name
-        : en.title || en.name,
+    title: bestTitle,
     original_title: en.title || en.name,
   };
 }

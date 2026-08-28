@@ -2,7 +2,29 @@
 // Response shape matches the legacy contract: { items: [...], page }.
 
 import { jsonResponse, CORS_HEADERS } from './_utils.js';
-import { tmdbFetch, mapListItem, TMDB_GENRE_IDS } from './_tmdb.js';
+import { tmdbFetch, mapListItem, mergeListTitles, TMDB_GENRE_IDS } from './_tmdb.js';
+
+/**
+ * Real Japanese anime: Animation genre + Japanese origin language.
+ * Without the original-language filter, TMDB's Animation genre is
+ * dominated by western kids' cartoons.
+ */
+async function fetchAnime(env, page, sortBy = 'popularity.desc') {
+  const params = {
+    page,
+    with_genres: 16,
+    with_original_language: 'ja',
+    sort_by: sortBy,
+  };
+  const [ar, en] = await Promise.all([
+    tmdbFetch(env, '/discover/tv', params, 'ar'),
+    tmdbFetch(env, '/discover/tv', params, 'en').catch(() => ({ results: [] })),
+  ]);
+  const merged = mergeListTitles(ar.results || [], en.results || []);
+  return merged
+    .map((r) => mapListItem(r, 'tv'))
+    .filter((i) => i.title && i.poster);
+}
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -33,10 +55,12 @@ export async function onRequest(context) {
 
     if (category === 'movies') {
       data = await tmdbFetch(env, '/movie/popular', { page }, 'ar');
-    } else if (category === 'series' || category === 'anime') {
-      data = category === 'anime'
-        ? await tmdbFetch(env, '/discover/tv', { page, with_genres: 16, sort_by: 'popularity.desc' }, 'ar')
-        : await tmdbFetch(env, '/tv/popular', { page }, 'ar');
+    } else if (category === 'series') {
+      data = await tmdbFetch(env, '/tv/popular', { page }, 'ar');
+    } else if (category === 'anime') {
+      // Real Japanese anime (not western animation), most popular first
+      const items = await fetchAnime(env, page, 'popularity.desc');
+      return jsonResponse({ items, page, total_pages: 500 }, 200, 300);
     } else if (genreId) {
       // Genre chips apply to movies by default
       data = await tmdbFetch(env, '/discover/movie', { page, with_genres: genreId, sort_by: 'popularity.desc' }, 'ar');
