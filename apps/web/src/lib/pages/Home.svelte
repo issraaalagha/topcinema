@@ -11,7 +11,7 @@
 
   let rows = $state([]);
   let recommendations = $state(null);
-  let heroItem = $state(null);
+  let heroItems = $state([]);
   let loading = $state(true);
   let error = $state('');
   let q = $state('');
@@ -52,7 +52,7 @@
         .catalog(1, category, '')
         .then((d) => {
           rows = [{ id: category, title: 'التصنيف المختار', items: d.items || [] }];
-          heroItem = d.items?.[0] || null;
+          heroItems = (d.items || []).filter((i) => i.backdrop).slice(0, 5);
         })
         .catch((e) => (error = e.message))
         .finally(() => (loading = false));
@@ -61,8 +61,10 @@
         .home()
         .then((d) => {
           rows = d.rows || [];
-          const firstRow = d.rows?.[0];
-          heroItem = firstRow?.items?.[0] || null;
+          // Hero carousel: top-5 trending with a backdrop + a story to show
+          heroItems = (d.rows?.[0]?.items || [])
+            .filter((i) => i.backdrop && i.story)
+            .slice(0, 5);
         })
         .catch((e) => (error = e.message))
         .finally(() => (loading = false));
@@ -110,8 +112,8 @@
 </script>
 
 <!-- Hero (home feed only) -->
-{#if initialTab !== 'watchlist' && !results && !selectedCategory && !loading && !error && heroItem}
-  <Hero item={heroItem} />
+{#if initialTab !== 'watchlist' && !results && !loading && !error && heroItems.length}
+  <Hero items={heroItems} />
 {/if}
 
 <!-- Search Bar & Filters (At Top) -->
