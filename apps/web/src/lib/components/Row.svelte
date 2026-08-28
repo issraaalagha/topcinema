@@ -1,7 +1,7 @@
 <script>
   import { isInWatchlist, toggleWatchlist } from '../store.js';
 
-  let { title, items = [], isContinueWatching = false } = $props();
+  let { title, items = [], isContinueWatching = false, variant = 'row' } = $props();
 
   let trackEl = $state();
 
@@ -46,7 +46,7 @@
       </div>
     </div>
 
-    <div class="track" bind:this={trackEl}>
+    <div class="track" class:grid={variant === 'grid'} bind:this={trackEl}>
       {#each items as it, idx (`${it.id || ''}_${idx}`)}
         <a class="card" href={'/watch/' + it.id}>
           <div class="poster-wrap">
@@ -57,6 +57,15 @@
               width="150"
               height="225"
             />
+
+            <!-- Cinematic hover shade + play affordance (pointer devices) -->
+            <div class="hover-shade" aria-hidden="true">
+              <span class="play-circle">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </span>
+            </div>
 
             {#if it.kind}
               <span class="kind-badge kind-{it.type}">{it.kind}</span>
@@ -97,11 +106,9 @@
           </div>
 
           <p class="name" title={it.title}>{it.title}</p>
-          {#if it.genres?.length}
-            <p class="meta">{it.genres.slice(0, 2).join(' • ')}</p>
-          {:else if it.year}
-            <p class="meta">{it.year}</p>
-          {/if}
+          <p class="meta">
+            {[it.genres?.slice(0, 2).join(' • '), it.year].filter(Boolean).join(' • ') || it.kind || ''}
+          </p>
         </a>
       {/each}
     </div>
@@ -166,6 +173,27 @@
     overflow-x: auto;
     padding: 6px 22px 18px;
     scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .track::-webkit-scrollbar {
+    display: none;
+  }
+  /* Full-browse grid variant (watchlist / search results) */
+  .track.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+    gap: 16px 14px;
+    overflow-x: visible;
+    padding: 6px 22px 20px;
+  }
+  .track.grid .card {
+    flex: initial;
+    width: 100%;
+  }
+  .track.grid .name,
+  .track.grid .meta {
+    max-width: 100%;
   }
   .card {
     flex: 0 0 150px;
@@ -197,6 +225,45 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* Cinematic hover shade + play affordance */
+  .hover-shade {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.12) 55%);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+  }
+  .play-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(229, 9, 20, 0.94);
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    color: #fff;
+    box-shadow: 0 8px 26px rgba(229, 9, 20, 0.55);
+    transform: scale(0.55);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    padding-inline-start: 3px;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .card:hover .hover-shade,
+    .card:focus-visible .hover-shade {
+      opacity: 1;
+    }
+    .card:hover .play-circle,
+    .card:focus-visible .play-circle {
+      transform: scale(1);
+    }
+    .card:hover .poster-wrap img {
+      transform: scale(1.08);
+    }
   }
   .quality {
     position: absolute;
@@ -321,8 +388,28 @@
     .card {
       flex: 0 0 126px;
     }
+    .track.grid {
+      grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+      padding: 4px 16px 16px;
+      gap: 14px 10px;
+    }
     .name {
       font-size: 12.5px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card:hover .poster-wrap,
+    .card:hover .poster-wrap img {
+      transform: none;
+    }
+    .poster-wrap img,
+    .play-circle,
+    .hover-shade {
+      transition: opacity 0.15s ease;
+    }
+    .play-circle {
+      transform: none;
     }
   }
 </style>

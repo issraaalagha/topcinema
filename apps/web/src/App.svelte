@@ -3,6 +3,7 @@
   import Watch from './lib/pages/Watch.svelte';
   import Admin from './lib/pages/Admin.svelte';
   import Login from './lib/components/Login.svelte';
+  import SearchOverlay from './lib/components/SearchOverlay.svelte';
   import { getWatchlist, syncFromCloud } from './lib/store.js';
   import { api, getAuthToken } from './lib/api.js';
 
@@ -28,6 +29,7 @@
   let userRole = $state(localStorage.getItem('tc_role') || 'viewer');
   let username = $state(localStorage.getItem('tc_username') || '');
   let checkingAuth = $state(!!getAuthToken());
+  let searchOpen = $state(false);
 
   function syncWatchlist() {
     watchlistCount = getWatchlist().length;
@@ -155,6 +157,8 @@
 
 <svelte:window onclick={handleLinkClick} />
 
+<SearchOverlay open={searchOpen} onClose={() => (searchOpen = false)} />
+
 <header class="topbar {isScrolled ? 'scrolled' : ''}">
   <div class="topbar-inner">
     <a href="/" class="brand" aria-label="توب سينما الرئيسية">
@@ -173,21 +177,33 @@
     </nav>
 
     <div class="header-actions">
-      <a href="/" class="search-nav-btn" title="البحث">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-          <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-        </svg>
-        <span class="search-nav-text">بحث سريع...</span>
-      </a>
+      {#if isAuthenticated}
+        <button
+          type="button"
+          class="search-nav-btn"
+          onclick={() => (searchOpen = true)}
+          title="بحث سريع (Esc للإغلاق)"
+          aria-label="بحث سريع"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          </svg>
+          <span class="search-nav-text">بحث سريع...</span>
+        </button>
+      {/if}
 
       {#if isAuthenticated}
         {#if canAdmin}
-          <a href="/admin" class="admin-btn {isAdminRoute ? 'active' : ''}" title="لوحة التحكم">
-            ⚙️
+          <a href="/admin" class="admin-btn {isAdminRoute ? 'active' : ''}" title="لوحة التحكم" aria-label="لوحة التحكم">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor">
+              <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+            </svg>
           </a>
         {/if}
         <button type="button" class="lock-btn" onclick={handleLogout} title="قفل المنصة وتسجيل الخروج" aria-label="قفل المنصة">
-          🔒
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm3 8.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5.67-1.5 1.5-1.5 1.5.67 1.5 1.5z"/>
+          </svg>
         </button>
       {/if}
     </div>

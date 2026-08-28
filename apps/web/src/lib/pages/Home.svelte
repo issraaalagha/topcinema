@@ -109,6 +109,11 @@
   }
 </script>
 
+<!-- Hero (home feed only) -->
+{#if initialTab !== 'watchlist' && !results && !selectedCategory && !loading && !error && heroItem}
+  <Hero item={heroItem} />
+{/if}
+
 <!-- Search Bar & Filters (At Top) -->
 <div class="home-toolbar">
   <div class="search-wrap">
@@ -179,12 +184,12 @@
         <a href="/" class="btn-explore">استكشف الأفلام والمسلسلات</a>
       </div>
     {:else}
-      <Row title={`الأعمال المحفوظة (${watchlist.length})`} items={watchlist} />
+      <Row title={`الأعمال المحفوظة (${watchlist.length})`} items={watchlist} variant="grid" />
     {/if}
   </section>
 {:else if loading}
   <!-- Shimmer Skeleton Loaders -->
-  <SkeletonRow />
+  <SkeletonHero />
   <SkeletonRow />
   <SkeletonRow />
 {:else if error}
@@ -198,9 +203,9 @@
     </button>
   </div>
 {:else if results}
-  <!-- Search Results Grid / Row -->
+  <!-- Search Results Grid -->
   <section class="results-section">
-    <Row title={`نتائج البحث عن "${q}" (${results.length})`} items={results} />
+    <Row title={`نتائج البحث عن "${q}" (${results.length})`} items={results} variant="grid" />
     {#if results.length === 0}
       <div class="empty-state">
         <span class="empty-icon">🔍</span>

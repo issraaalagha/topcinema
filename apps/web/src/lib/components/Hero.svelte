@@ -20,13 +20,13 @@
 {#if item}
   <section class="hero" aria-label="العمل المميز">
     <!-- Ambient Depth Background Glow -->
-    <div class="hero-ambient-glow" style="background-image: url('{item.poster || '/icons/icon.svg'}')"></div>
+    <div class="hero-ambient-glow" style="background-image: url('{item.backdrop || item.poster || '/icons/icon.svg'}')"></div>
 
-    <!-- Crisp Backdrop Poster with Right-Alight Cinematic Position -->
+    <!-- Crisp Cinematic Backdrop -->
     <div class="hero-backdrop-wrap">
       <img
         class="hero-backdrop"
-        src={item.poster || '/icons/icon.svg'}
+        src={item.backdrop || item.poster || '/icons/icon.svg'}
         alt={item.title}
         loading="eager"
         fetchpriority="high"
@@ -41,6 +41,9 @@
     <!-- Foreground Content & Metadata -->
     <div class="hero-content">
       <div class="meta-row">
+        {#if item.kind}
+          <span class="badge badge-kind">{item.kind}</span>
+        {/if}
         {#if item.quality}
           <span class="badge badge-quality">{item.quality}</span>
         {/if}
@@ -55,7 +58,6 @@
         {#if item.year}
           <span class="badge badge-year">{item.year}</span>
         {/if}
-        <span class="badge badge-featured">🔥 مميز اليوم</span>
       </div>
 
       <h1 class="hero-title">{item.title}</h1>
@@ -103,9 +105,10 @@
     position: relative;
     width: 100%;
     min-height: 520px;
+    min-height: min(80svh, 660px);
     display: flex;
     align-items: center;
-    padding: 80px 48px 60px;
+    padding: calc(76px + env(safe-area-inset-top, 0px)) 48px 60px;
     margin-bottom: 24px;
     overflow: hidden;
     background: #07090e;
@@ -235,9 +238,14 @@
     color: var(--text-secondary);
     border: 1px solid var(--border-glass);
   }
+  .badge-kind {
+    background: rgba(37, 99, 235, 0.85);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
 
   .hero-title {
-    font-size: 42px;
+    font-size: clamp(27px, 4.6vw, 46px);
     font-weight: 900;
     line-height: 1.22;
     letter-spacing: -0.5px;
@@ -332,23 +340,35 @@
 
   @media (max-width: 900px) {
     .hero {
-      min-height: 440px;
-      padding: 60px 24px 36px;
+      min-height: 460px;
+      min-height: min(68svh, 560px);
+      padding: calc(64px + env(safe-area-inset-top, 0px)) 20px 34px;
       align-items: flex-end;
     }
     .hero-backdrop {
       width: 100%;
-      opacity: 0.6;
+      opacity: 0.55;
     }
     .hero-vignette-left {
-      background: linear-gradient(to top, rgba(7, 9, 14, 0.95) 20%, rgba(7, 9, 14, 0.6) 70%, transparent 100%);
-    }
-    .hero-title {
-      font-size: 28px;
+      background: linear-gradient(to top, rgba(7, 9, 14, 0.96) 18%, rgba(7, 9, 14, 0.55) 70%, transparent 100%);
     }
     .hero-story {
       font-size: 13.5px;
       -webkit-line-clamp: 2;
+    }
+    .hero-actions .btn-primary,
+    .hero-actions .btn-secondary {
+      min-height: 46px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero:hover .hero-backdrop {
+      transform: none;
+    }
+    .btn-primary:hover,
+    .btn-secondary:hover {
+      transform: none;
     }
   }
 </style>

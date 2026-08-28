@@ -154,6 +154,7 @@ export function mapListItem(item, type) {
     title: (item.title || item.name || '').trim(),
     poster: imgUrl(item.poster_path, 'w500'),
     backdrop: imgUrl(item.backdrop_path, 'w780'),
+    story: (item.overview || '').trim(),
     quality: (item.vote_average || 0) >= 7 ? 'HD 1080' : 'HD',
     rating: item.vote_average ? String(Math.round(item.vote_average * 10) / 10) : '',
     genres,
