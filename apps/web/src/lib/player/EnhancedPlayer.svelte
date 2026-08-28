@@ -35,15 +35,18 @@
   // Embedded-host mode: some servers only allow playback inside their own player iframe.
   const isEmbedFrame = $derived(type === 'iframe');
 
-  // CineSrc embeds accept official URL params: brand accent, preferred Arabic
-  // subtitles, quality hint, intro auto-skip, and a close-button back channel.
+  // CineSrc embeds accept official URL params: brand accent, quality hint,
+  // intro auto-skip, and a close-button back channel.
+  // NOTE: deliberately NOT passing subtitlelang — CineSrc's own Arabic tracks
+  // are frequently malformed and their player toasts on auto-select failure.
+  // Arabic comes from our /api/subtitles in direct mode, or manual upload in
+  // embed mode (their player remembers the choice per title).
   const embedSrc = $derived.by(() => {
     if (!src || !isEmbedFrame) return src;
     try {
       const u = new URL(src, window.location.origin);
       if (u.hostname.endsWith('cinesrc.st')) {
         u.searchParams.set('color', '#e50914');
-        u.searchParams.set('subtitlelang', 'ar');
         u.searchParams.set('quality', '1080');
         u.searchParams.set('autoskip', 'true');
         u.searchParams.set('back', 'close');
