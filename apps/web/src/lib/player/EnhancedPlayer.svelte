@@ -17,7 +17,11 @@
     type = 'auto',
     strategy = 'direct',
     subtitleUrl = '',
+    resumeAt = 0,
+    onTimeUpdate = null,
     onError = null,
+    onEnded = null,
+    onClose = null,
     onReady = null
   } = $props();
 
@@ -30,6 +34,63 @@
 
   // Embedded-host mode: some servers only allow playback inside their own player iframe.
   const isEmbedFrame = $derived(type === 'iframe');
+
+  // CineSrc embeds accept official URL params: brand accent, preferred Arabic
+  // subtitles, quality hint, intro auto-skip, and a close-button back channel.
+  const embedSrc = $derived.by(() => {
+    if (!src || !isEmbedFrame) return src;
+    try {
+      const u = new URL(src, window.location.origin);
+      if (u.hostname.endsWith('cinesrc.st')) {
+        u.searchParams.set('color', '#e50914');
+        u.searchParams.set('subtitlelang', 'ar');
+        u.searchParams.set('quality', '1080');
+        u.searchParams.set('autoskip', 'true');
+        u.searchParams.set('back', 'close');
+        if (resumeAt && Number.isFinite(resumeAt) && resumeAt > 30) {
+          u.searchParams.set('t', String(Math.floor(resumeAt)));
+        }
+      }
+      return u.toString();
+    } catch {
+      return src;
+    }
+  });
+
+  // Official postMessage bridge (https://cinesrc.st/docs): surface playback
+  // progress, errors, end-of-stream, and the player's back/close action.
+  $effect(() => {
+    if (!isEmbedFrame) return;
+    const handler = (event) => {
+      if (event.origin !== 'https://cinesrc.st') return;
+      const data = event.data || {};
+      const evtType = String(data.type || '');
+      if (!evtType.startsWith('cinesrc:')) return;
+      if (evtType === 'cinesrc:timeupdate' && onTimeUpdate) {
+        onTimeUpdate(data.currentTime, data.duration);
+      } else if (evtType === 'cinesrc:error' && onError) {
+        onError(data.error || 'stream error');
+      } else if (evtType === 'cinesrc:ended' && onEnded) {
+        onEnded();
+      } else if (evtType === 'cinesrc:close' && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  });
+
+  // Native playback path: forward <video> progress through the same callback.
+  $effect(() => {
+    if (isEmbedFrame || !videoElement) return;
+    const handler = () => {
+      if (onTimeUpdate && videoElement) {
+        onTimeUpdate(videoElement.currentTime, videoElement.duration);
+      }
+    };
+    videoElement.addEventListener('timeupdate', handler);
+    return () => videoElement.removeEventListener('timeupdate', handler);
+  });
 
   function initPlayer() {
     if (!videoElement || !src || isEmbedFrame) return;
@@ -229,7 +290,7 @@
     <!-- Embedded host player (used when direct extraction is blocked upstream) -->
     <iframe
       class="embed-frame"
-      {src}
+      src={embedSrc}
       title={title || 'مشغل الفيديو'}
       allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
       allowfullscreen

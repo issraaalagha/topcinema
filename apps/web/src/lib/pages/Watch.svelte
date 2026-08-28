@@ -14,6 +14,10 @@
   let resolveError = $state('');
   let inList = $state(false);
   let copied = $state(false);
+  let resumeAt = $state(0);
+  let failoverCount = $state(0);
+
+  const PROGRESS_SAVE_INTERVAL = 15; // seconds
 
   function syncWatchlistStatus() {
     if (id) inList = isInWatchlist(id);
@@ -37,9 +41,17 @@
 
       api
         .post(currentId)
-        .then((d) => {
+        .then(async (d) => {
           data = d;
           syncWatchlistStatus();
+
+          // Restore last playback position BEFORE mounting the player so the
+          // embed URL carries the resume timestamp on first load.
+          try {
+            const h = await api.getHistory();
+            const hit = (h.items || []).find((i) => i.id === currentId);
+            if (hit && hit.currentTime > 30) resumeAt = hit.currentTime;
+          } catch {}
 
           // Auto-pick preferred server (CineSrc 1080p first, then legacy)
           const preferred =
@@ -53,11 +65,12 @@
     });
   });
 
-  async function pick(srv) {
+  async function pick(srv, isAutoFailover = false) {
     selectedServer = srv;
     stream = null;
     resolveError = '';
     resolving = true;
+    if (!isAutoFailover) failoverCount = 0;
 
     try {
       const r = await api.resolve(id, srv.server);
@@ -91,6 +104,42 @@
       }
     } finally {
       resolving = false;
+    }
+  }
+
+  let lastProgressSave = 0;
+  function handleTimeUpdate(currentTime, duration) {
+    if (!data?.post || !currentTime || !duration) return;
+    const now = Date.now();
+    if (now - lastProgressSave < PROGRESS_SAVE_INTERVAL * 1000) return;
+    lastProgressSave = now;
+
+    api
+      .saveProgress({
+        id,
+        title: data.post.title,
+        poster: data.post.poster,
+        quality: data.post.quality,
+        currentTime,
+        duration,
+      })
+      .catch(() => {});
+  }
+
+  function handleStreamError(reason) {
+    console.warn('[Watch] Stream error:', reason);
+    const servers = data?.servers || [];
+    if (!servers.length || !selectedServer) return;
+    if (failoverCount >= servers.length - 1) {
+      resolveError = 'فشل جميع السيرفرات — جرب تحديث الصفحة لاحقاً';
+      return;
+    }
+    const idx = servers.findIndex((s) => s.server === selectedServer.server);
+    const next = servers[(idx + 1) % servers.length];
+    if (next && next.server !== selectedServer.server) {
+      failoverCount += 1;
+      resolveError = `تعذر التشغيل على ${selectedServer.name} — تجربة ${next.name} تلقائياً…`;
+      pick(next, true);
     }
   }
 
@@ -157,12 +206,13 @@
             subtitleUrl={stream.type === 'iframe'
               ? ''
               : `/api/subtitles/${data.post.type}/${data.post.tmdbId}`}
-            onError={(err) => {
-              console.error('[Player] Error:', err);
-              resolveError = 'فشل تشغيل الفيديو. جرب سيرفر آخر.';
-            }}
-            onReady={() => {
-              console.log('[Player] Ready');
+            {resumeAt}
+            onTimeUpdate={handleTimeUpdate}
+            onError={handleStreamError}
+            onEnded={() => console.log('[Watch] Playback ended')}
+            onClose={() => {
+              stream = null;
+              resumeAt = 0;
             }}
           />
         {:else}
@@ -191,6 +241,15 @@
             </button>
           {/each}
         </div>
+        {#if stream?.type === 'iframe' && data.post.type && data.post.tmdbId}
+          <a
+            class="subtitle-download"
+            href={`/api/subtitles/${data.post.type}/${data.post.tmdbId}`}
+            download="topcinema-arabic.vtt"
+          >
+            ⬇️ تحميل الترجمة العربية (ارفعها من زر Subtitles في المشغل إن لم تظهر)
+          </a>
+        {/if}
       </div>
     </div>
 
@@ -380,6 +439,22 @@
   .srv-btn.active .srv-dot {
     background: #fff;
     box-shadow: 0 0 6px #fff;
+  }
+  .subtitle-download {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 8px 14px;
+    border-radius: var(--radius-pill);
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px dashed rgba(16, 185, 129, 0.5);
+    color: var(--success, #10b981);
+    font-size: 12.5px;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+  }
+  .subtitle-download:hover {
+    background: rgba(16, 185, 129, 0.22);
+    transform: translateY(-1px);
   }
   .info-col {
     background: var(--bg-surface);

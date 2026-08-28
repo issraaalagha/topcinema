@@ -30,3 +30,5 @@ ConnectionResetError: [WinError 10054] An existing connection was forcibly close
 ----------------------------------------
 [http] 127.0.0.1 "GET /health HTTP/1.1" 200 -
 [http] 127.0.0.1 "GET /extract?url=https%3A%2F%2Fcinesrc.st%2Fembed%2Fmovie%2F969681&server=CineSrc HTTP/1.1" 200 -
+[http] 127.0.0.1 "GET / HTTP/1.1" 404 -
+[http] 127.0.0.1 "GET /favicon.ico HTTP/1.1" 404 -
