@@ -3,7 +3,7 @@
 // { post: {...}, servers: [{name, server}] }
 
 import { jsonResponse, CORS_HEADERS, UPSTREAM_URL, fetchHtml } from '../_utils.js';
-import { tmdbDetails, imgUrl, parseCompositeId, cineSrcEmbedUrl } from '../_tmdb.js';
+import { tmdbDetails, tmdbFetch, imgUrl, parseCompositeId, cineSrcEmbedUrl } from '../_tmdb.js';
 import { cleanText } from '../_utils.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
