@@ -17,6 +17,7 @@
   let resumeAt = $state(0);
   let failoverCount = $state(0);
   let copiedStream = $state(false);
+  let copiedSubUrl = $state(false);
   let selectedSeason = $state(null);
   let selectedEpisode = $state(null);
   let episodes = $state([]);
@@ -367,14 +368,26 @@
             </button>
           {/each}
         </div>
-        {#if stream?.type === 'iframe' && data.post.type && data.post.tmdbId}
+        {#if stream && data.post.type && data.post.tmdbId}
           <a
             class="subtitle-download"
             href={`/api/subtitles/${data.post.type}/${data.post.tmdbId}`}
-            download="topcinema-arabic.vtt"
+            download="freewatch-arabic.vtt"
           >
-            ⬇️ تحميل الترجمة العربية (ارفعها من زر Subtitles في المشغل إن لم تظهر)
+            ⬇️ تحميل الترجمة العربية (ملف VTT)
           </a>
+          <button
+            type="button"
+            class="subtitle-download"
+            onclick={() => {
+              const subUrl = `${location.origin}/api/subtitles/${data.post.type}/${data.post.tmdbId}`;
+              navigator.clipboard?.writeText(subUrl);
+              copiedSubUrl = true;
+              setTimeout(() => (copiedSubUrl = false), 2500);
+            }}
+          >
+            {copiedSubUrl ? '✅ تم نسخ رابط الترجمة — الصقه في Subtitles from URL' : '📋 نسخ رابط الترجمة (لصقه في Subtitles from URL داخل WVC)'}
+          </button>
         {/if}
         {#if stream && stream.type !== 'iframe'}
           <button
