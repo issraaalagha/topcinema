@@ -16,6 +16,7 @@
   let copied = $state(false);
   let resumeAt = $state(0);
   let failoverCount = $state(0);
+  let copiedStream = $state(false);
   let selectedSeason = $state(null);
   let selectedEpisode = $state(null);
   let episodes = $state([]);
@@ -163,6 +164,7 @@
         console.log('[Watch] Resolved Stream URL:', r.url);
         stream = {
           url: r.url,
+          copyUrl: new URL(r.url, location.origin).href,
           type: r.type || (r.url.includes('.mp4') ? 'mp4' : 'hls'),
           server: srv.name
         };
@@ -373,6 +375,19 @@
           >
             ⬇️ تحميل الترجمة العربية (ارفعها من زر Subtitles في المشغل إن لم تظهر)
           </a>
+        {/if}
+        {#if stream && stream.type !== 'iframe'}
+          <button
+            type="button"
+            class="subtitle-download"
+            onclick={() => {
+              navigator.clipboard?.writeText(stream.copyUrl || '');
+              copiedStream = true;
+              setTimeout(() => (copiedStream = false), 2500);
+            }}
+          >
+            {copiedStream ? '✅ تم نسخ رابط البث — الصقه في Web Video Caster أو VLC' : '🔗 نسخ رابط البث المباشر (للتشغيل في Web Video Caster / VLC / التلفاز)'}
+          </button>
         {/if}
       </div>
     </div>
