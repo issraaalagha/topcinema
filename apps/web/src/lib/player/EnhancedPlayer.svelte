@@ -10,14 +10,15 @@
   import 'plyr/dist/plyr.css';
   import { castManager } from '../services/castManager.js';
 
-  let { 
-    src, 
-    title = '', 
-    poster = '', 
+  let {
+    src,
+    title = '',
+    poster = '',
     type = 'auto',
     strategy = 'direct',
+    subtitleUrl = '',
     onError = null,
-    onReady = null 
+    onReady = null
   } = $props();
 
   let videoElement = $state(null);
@@ -104,6 +105,7 @@
       autoplay: false,
       keyboard: { focused: true, global: true },
       tooltips: { controls: true, seek: true },
+      captions: { active: true, language: 'ar', immediate: true },
       storage: { enabled: true, key: 'topcinema-player' }
     });
 
@@ -232,7 +234,7 @@
       allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
       allowfullscreen
       referrerpolicy="origin"
-      sandbox="allow-scripts allow-same-origin allow-presentation allow-forms allow-popups"
+      sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
     ></iframe>
   {:else}
   <!-- Chromecast Floating Trigger Button -->
@@ -257,7 +259,17 @@
     {poster}
     playsinline
     preload="metadata"
-  ></video>
+  >
+    {#if subtitleUrl}
+      <track
+        kind="subtitles"
+        label="العربية"
+        srclang="ar"
+        src={subtitleUrl}
+        default
+      />
+    {/if}
+  </video>
   {/if}
 </div>
 

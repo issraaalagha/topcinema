@@ -1,4 +1,5 @@
 import { UPSTREAM_URL, jsonResponse, CORS_HEADERS } from '../../_utils.js';
+import { parseCompositeId, cineSrcEmbedUrl } from '../../_tmdb.js';
 
 /**
  * 🎬 TopCinema Enterprise Multi-Engine Stream Resolvers (v3.0.0 VIP Core)
@@ -151,11 +152,57 @@ const ENGINES = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 2. Shared extraction helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tier-1: call the local browser-based extraction service (residential IP)
+ * when EXTRACTOR_URL is configured. Returns {url, type} or null.
+ */
+async function tryLocalExtractor(env, embedUrl, label) {
+  const extractorBase = (env && env.EXTRACTOR_URL) || '';
+  if (!extractorBase) return null;
+  try {
+    const extractorUrl = `${extractorBase.replace(/\/$/, '')}/extract?url=${encodeURIComponent(embedUrl)}&server=${encodeURIComponent(label)}`;
+    const extRes = await fetch(extractorUrl, {
+      signal: AbortSignal.timeout(70000),
+      headers: { 'User-Agent': 'topcinema-pages-function' },
+    });
+    if (!extRes.ok) return null;
+    const extData = await extRes.json();
+    if (extData.ok && extData.url) {
+      return {
+        url: extData.url,
+        type: extData.url.includes('.mp4') ? 'mp4' : 'hls',
+        method: extData.method || 'unknown',
+      };
+    }
+  } catch {}
+  return null;
+}
+
+function proxiedResponse(embedUrl, stream, engine) {
+  let embedOrigin = '';
+  try {
+    const parsed = new URL(embedUrl);
+    embedOrigin = `${parsed.protocol}//${parsed.hostname}/`;
+  } catch {}
+  const proxiedUrl = `/api/proxy?url=${encodeURIComponent(stream.url)}&ref=${encodeURIComponent(embedOrigin)}`;
+  return jsonResponse({
+    ok: true,
+    url: proxiedUrl,
+    direct: stream.url,
+    type: stream.type,
+    engine,
+  }, 200, 300);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 3. Worker Request Handler
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function onRequest(context) {
-  const { request, params } = context;
+  const { request, params, env } = context;
 
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -164,6 +211,26 @@ export async function onRequest(context) {
   const { id, server } = params;
 
   try {
+    // ── TMDB/CineSrc path ──────────────────────────────────────────────────
+    // Composite ids like "movie-969681" / "tv-94605-1-8" resolve via CineSrc.
+    const tmdbParsed = parseCompositeId(server || id);
+    if (tmdbParsed) {
+      const embedUrl = cineSrcEmbedUrl(tmdbParsed);
+
+      const stream = await tryLocalExtractor(env, embedUrl, 'CineSrc');
+      if (stream) {
+        return proxiedResponse(embedUrl, stream, 'LocalExtractor (CineSrc)');
+      }
+
+      // No extractor available/failed → hand the embed to the player's iframe mode
+      return jsonResponse({
+        ok: false,
+        error: 'المستخرج المحلي غير متاح — سيتم التضمين المباشر',
+        embedUrl,
+      }, 200);
+    }
+
+    // ── Legacy topcinemaa path ─────────────────────────────────────────────
     let postId = id;
     let serverIdx = '0';
 
@@ -203,6 +270,12 @@ export async function onRequest(context) {
       const parsed = new URL(embedUrl);
       embedOrigin = `${parsed.protocol}//${parsed.hostname}/`;
     } catch {}
+
+    // Step 1.5: Tier-1 — local/browser extraction service (residential IP).
+    const stream = await tryLocalExtractor(env, embedUrl, serverIdx);
+    if (stream) {
+      return proxiedResponse(embedUrl, stream, `LocalExtractor (${stream.method})`);
+    }
 
     // Step 2: Route embedUrl to the specialized server engine
     const matchedEngine = ENGINES.find((engine) => engine.canHandle(embedUrl)) || GenericEngine;

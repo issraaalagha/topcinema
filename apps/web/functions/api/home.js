@@ -1,63 +1,40 @@
-import { UPSTREAM_URL, jsonResponse, fetchHtml, parseMovieItems, CORS_HEADERS } from './_utils.js';
+// Home feed powered by TMDB (Arabic-first, English fallback).
+// Response shape matches the legacy scraper contract: { rows: [...] }.
+
+import { jsonResponse, CORS_HEADERS } from './_utils.js';
+import { tmdbFetch, mapListItem } from './_tmdb.js';
 
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
 
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
   try {
-    const html = await fetchHtml(UPSTREAM_URL);
-    const allItems = parseMovieItems(html);
+    const [trendingAll, trendingMovies, onTheAir, topMovies] = await Promise.all([
+      tmdbFetch(env, '/trending/all/week', {}, 'ar').catch(() => ({ results: [] })),
+      tmdbFetch(env, '/movie/popular', { page: 1 }, 'ar').catch(() => ({ results: [] })),
+      tmdbFetch(env, '/tv/on_the_air', { page: 1 }, 'ar').catch(() => ({ results: [] })),
+      tmdbFetch(env, '/movie/top_rated', { page: 1 }, 'ar').catch(() => ({ results: [] })),
+    ]);
 
-    // Distribute into meaningful sections
-    const recent = allItems.slice(0, 15);
-    const trending = allItems.slice(15, 30);
-    const topRated = allItems.filter(it => parseFloat(it.imdb) >= 7.0 || it.quality.includes('1080')).slice(0, 15);
-    const more = allItems.slice(30, 48);
+    const all = (list, type) =>
+      (list.results || [])
+        .filter((r) => r.media_type ? r.media_type === type || type === 'all' : true)
+        .map((r) => mapListItem(r, r.media_type === 'tv' ? 'tv' : type === 'all' ? (r.title ? 'movie' : 'tv') : type))
+        .filter((i) => i.title && i.poster)
+        .slice(0, 18);
 
     const rows = [
-      {
-        id: 'recent-movies',
-        title: 'أحدث الأفلام والمسلسلات المضافة ✨',
-        items: recent,
-      },
-    ];
-
-    if (topRated.length > 0) {
-      rows.push({
-        id: 'top-rated',
-        title: 'الأعلى تقييماً وجودة (IMDb 7+) 🌟',
-        items: topRated,
-      });
-    }
-
-    if (trending.length > 0) {
-      rows.push({
-        id: 'trending',
-        title: 'الأكثر رواجاً ومشاهدة الآن 🔥',
-        items: trending,
-      });
-    }
-
-    if (more.length > 0) {
-      rows.push({
-        id: 'recommended',
-        title: 'مختارات ومقترحات سينمائية 🍿',
-        items: more,
-      });
-    }
+      { id: 'trending', title: 'الأكثر رواجاً هذا الأسبوع 🔥', items: all(trendingAll, 'all') },
+      { id: 'recent-movies', title: 'أحدث الأفلام الرائجة ✨', items: all(trendingMovies, 'movie') },
+      { id: 'on-air-tv', title: 'مسلسلات تُعرض حالياً 📺', items: all(onTheAir, 'tv') },
+      { id: 'top-rated', title: 'الأعلى تقييماً على الإطلاق 🌟', items: all(topMovies, 'movie') },
+    ].filter((r) => r.items.length > 0);
 
     return jsonResponse({ rows }, 200, 600);
   } catch (error) {
-    return jsonResponse(
-      {
-        error: 'Failed to load home feed',
-        message: error.message,
-        rows: [],
-      },
-      500
-    );
+    return jsonResponse({ error: 'Failed to load home feed', message: error.message, rows: [] }, 500);
   }
 }

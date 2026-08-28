@@ -1,0 +1,32 @@
+🚀 TopCinema extractor service on http://localhost:8786
+   chromium: loading…
+[engine] Chromium ready
+[http] 127.0.0.1 "GET /health HTTP/1.1" 200 -
+[http] 127.0.0.1 "GET /extract?url=https%3A%2F%2Fluluvdo.com%2Fe%2F46pezz6n5pm0&server=LuluStream HTTP/1.1" 200 -
+----------------------------------------
+Exception happened during processing of request from ('127.0.0.1', 57972)
+Traceback (most recent call last):
+  File "C:\Users\pdpsa\.conda\envs\AudioX\lib\socketserver.py", line 683, in process_request_thread
+    self.finish_request(request, client_address)
+  File "C:\Users\pdpsa\.conda\envs\AudioX\lib\socketserver.py", line 360, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "C:\Users\pdpsa\.conda\envs\AudioX\lib\socketserver.py", line 747, in __init__
+    self.handle()
+  File "C:\Users\pdpsa\.conda\envs\AudioX\lib\http\server.py", line 435, in handle
+    self.handle_one_request()
+  File "C:\Users\pdpsa\.conda\envs\AudioX\lib\http\server.py", line 423, in handle_one_request
+    method()
+  File "extractor_service.py", line 323, in do_GET
+    return self._send({"ok": True, "url": url, "method": method})
+  File "extractor_service.py", line 288, in _send
+    self.end_headers()
+  File "C:\Users\pdpsa\.conda\envs\AudioX\lib\http\server.py", line 537, in end_headers
+    self.flush_headers()
+  File "C:\Users\pdpsa\.conda\envs\AudioX\lib\http\server.py", line 541, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "C:\Users\pdpsa\.conda\envs\AudioX\lib\socketserver.py", line 826, in write
+    self._sock.sendall(b)
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+----------------------------------------
+[http] 127.0.0.1 "GET /health HTTP/1.1" 200 -
+[http] 127.0.0.1 "GET /extract?url=https%3A%2F%2Fcinesrc.st%2Fembed%2Fmovie%2F969681&server=CineSrc HTTP/1.1" 200 -

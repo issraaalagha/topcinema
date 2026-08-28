@@ -41,8 +41,9 @@
           data = d;
           syncWatchlistStatus();
 
-          // Auto-pick preferred server (VideoTube first for adaptive HLS, then UpDown)
+          // Auto-pick preferred server (CineSrc 1080p first, then legacy)
           const preferred =
+            d.servers?.find((s) => /cinesrc/i.test(s.name)) ||
             d.servers?.find((s) => /vidtube|videotube/i.test(s.name)) ||
             d.servers?.find((s) => /updown/i.test(s.name)) ||
             d.servers?.[0];
@@ -153,6 +154,9 @@
             poster={data.post.poster}
             type={stream.type}
             strategy="direct"
+            subtitleUrl={stream.type === 'iframe'
+              ? ''
+              : `/api/subtitles/${data.post.type}/${data.post.tmdbId}`}
             onError={(err) => {
               console.error('[Player] Error:', err);
               resolveError = 'فشل تشغيل الفيديو. جرب سيرفر آخر.';
