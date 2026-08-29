@@ -119,7 +119,7 @@
   .x-btn {
     position: absolute;
     top: 14px;
-    inset-inline-start: 14px;
+    inset-inline-end: 14px;
     z-index: 5;
     width: 38px;
     height: 38px;
@@ -152,7 +152,7 @@
   .m-brand {
     position: absolute;
     top: 16px;
-    inset-inline-end: 22px;
+    inset-inline-start: 22px;
     color: var(--accent, #e50914);
     font-weight: 900;
     font-size: 13px;
@@ -162,7 +162,7 @@
   .m-title {
     position: absolute;
     bottom: 58px;
-    inset-inline-end: 26px;
+    inset-inline-start: 26px;
     max-width: 75%;
     font-size: clamp(24px, 3.4vw, 38px);
     font-weight: 900;
@@ -173,7 +173,7 @@
   .m-hero-actions {
     position: absolute;
     bottom: 20px;
-    inset-inline-end: 26px;
+    inset-inline-start: 26px;
   }
   .go-play {
     display: inline-flex;
