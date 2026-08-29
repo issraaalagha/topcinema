@@ -6,44 +6,52 @@
 
   let items = $state([]);
   let title = $state('');
-  let page = $state(0);
   let totalPages = $state(1);
   let loading = $state(true);
   let loadingMore = $state(false);
   let error = $state('');
 
+  // Pagination lives OUTSIDE reactivity on purpose: writing `page` inside
+  // load() (which reads it) re-triggered the $effect → infinite request loop.
+  let currentPage = 0;
+  let seq = 0;
+
   $effect(() => {
-    listId;
     reset();
   });
 
   function reset() {
+    seq++;
     items = [];
-    page = 0;
+    currentPage = 0;
     totalPages = 1;
     error = '';
     load();
   }
 
   async function load() {
-    const next = page + 1;
+    const mySeq = ++seq;
+    const next = currentPage + 1;
     loading = true;
     try {
       const d = await api.browseList(listId, next);
+      if (mySeq !== seq) return; // superseded by a newer load
       title = d.title || title;
-      totalPages = d.total_pages || 1;
+      totalPages = d.totalPages || 1;
       items = [...items, ...(d.items || [])];
-      page = next;
+      currentPage = next;
     } catch (e) {
-      error = e.message;
+      if (mySeq === seq) error = e.message;
     } finally {
-      loading = false;
-      loadingMore = false;
+      if (mySeq === seq) {
+        loading = false;
+        loadingMore = false;
+      }
     }
   }
 
   function loadMore() {
-    if (loadingMore || page >= totalPages) return;
+    if (loadingMore || currentPage >= totalPages) return;
     loadingMore = true;
     load();
   }

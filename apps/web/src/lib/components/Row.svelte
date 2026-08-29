@@ -35,10 +35,11 @@
   }
   function showPreview(e, it) {
     if (!canHover() || variant === 'ranked') return;
+    const card = e.currentTarget; // capture NOW — nullified after the handler
+    if (!card) return;
     clearTimeout(hideTimer);
     clearTimeout(previewTimer);
     previewTimer = setTimeout(() => {
-      const card = e.currentTarget;
       const r = card.getBoundingClientRect();
       const panelW = Math.min(340, Math.round(r.width * 1.6));
       const left = Math.max(10, Math.min(r.left - (panelW - r.width) / 2, window.innerWidth - panelW - 10));
