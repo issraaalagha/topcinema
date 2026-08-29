@@ -104,11 +104,19 @@
 
   async function play(it) {
     try {
+      // Resume from the saved position for this exact item/episode
+      let resume = 0;
+      try {
+        const h = await api.getHistory();
+        const hit = (h.items || []).find((x) => x.id === it.id);
+        if (hit && hit.currentTime > 30) resume = hit.currentTime;
+      } catch {}
+
       const r = await api.resolve(it.id, it.id);
       if (r.ok && r.url) {
         playing = {
           url: r.url,
-          copyUrl: new URL(r.url, location.origin).href,
+          resumeAt: resume,
           type: r.type || 'hls',
           title: it.title,
           poster: it.poster || '',
@@ -118,7 +126,7 @@
               : ''
         };
       } else if (r.embedUrl) {
-        playing = { url: r.embedUrl, type: 'iframe', title: it.title, poster: it.poster || '', subtitleUrl: '' };
+        playing = { url: r.embedUrl, resumeAt: resume, type: 'iframe', title: it.title, poster: it.poster || '', subtitleUrl: '' };
       }
     } catch {
       // ignore — stay on grid
@@ -170,7 +178,7 @@
         type={playing.type}
         strategy="direct"
         subtitleUrl={playing.type === 'iframe' ? '' : playing.subtitleUrl}
-        resumeAt={0}
+        resumeAt={playing.resumeAt || 0}
       />
       <p class="tv-back-hint">اضغط زر الرجوع/Escape للعودة إلى القائمة</p>
     </div>

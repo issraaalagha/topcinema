@@ -84,6 +84,9 @@
     {#key active}
       <div class="hero-content">
         <div class="meta-row">
+          {#if items.length > 1}
+            <span class="badge badge-rank">#{active + 1} الأكثر رواجاً اليوم</span>
+          {/if}
           {#if item.kind}
             <span class="badge badge-kind">{item.kind}</span>
           {/if}
@@ -283,6 +286,11 @@
     font-size: 12px;
     font-weight: 700;
     backdrop-filter: blur(10px);
+  }
+  .badge-rank {
+    background: rgba(229, 9, 20, 0.25);
+    border: 1px solid rgba(229, 9, 20, 0.5);
+    color: #ff8a92;
   }
   .badge-kind {
     background: rgba(37, 99, 235, 0.85);

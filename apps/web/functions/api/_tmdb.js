@@ -168,6 +168,12 @@ export async function tmdbDetails(env, type, id, append = '') {
 export function mapListItem(item, type) {
   const date = item.release_date || item.first_air_date || '';
   const year = date ? date.slice(0, 4) : '';
+  // "جديد" = released within the last 14 days
+  let isNew = false;
+  if (date) {
+    const days = (Date.now() - new Date(date + 'T00:00:00Z').getTime()) / 86400000;
+    isNew = days >= 0 && days <= 14;
+  }
   const genreIds = item.genre_ids || [];
   const genres = genreIds.map((gid) => GENRE_MAP_AR[gid]).filter(Boolean);
   // Type badge: anime is animation-genre TV, everything TV-ish is a series
@@ -182,6 +188,7 @@ export function mapListItem(item, type) {
     poster: imgUrl(item.poster_path, 'w500'),
     backdrop: imgUrl(item.backdrop_path, 'w780'),
     story: (item.overview || '').trim(),
+    isNew,
     quality: (item.vote_average || 0) >= 7 ? 'HD 1080' : 'HD',
     rating: item.vote_average ? String(Math.round(item.vote_average * 10) / 10) : '',
     genres,

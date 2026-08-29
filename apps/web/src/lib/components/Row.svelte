@@ -150,6 +150,10 @@
               <span class="kind-badge kind-{it.type}">{it.kind}</span>
             {/if}
 
+            {#if it.isNew}
+              <span class="new-chip">جديد</span>
+            {/if}
+
             {#if it.quality}
               <span class="quality">{it.quality}</span>
             {/if}
@@ -464,6 +468,9 @@
     scroll-snap-type: x proximity;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    /* trailing-edge fade (RTL: left end) */
+    mask-image: linear-gradient(to left, transparent 0, #000 26px);
+    -webkit-mask-image: linear-gradient(to left, transparent 0, #000 26px);
   }
   .track::-webkit-scrollbar {
     display: none;
@@ -553,6 +560,17 @@
     .card:hover .poster-wrap img {
       transform: scale(1.08);
     }
+  }
+  .new-chip {
+    position: absolute;
+    bottom: 8px;
+    inset-inline-start: 8px;
+    background: rgba(16, 185, 129, 0.9);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
   }
   .quality {
     position: absolute;
