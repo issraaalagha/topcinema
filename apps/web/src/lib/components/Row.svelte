@@ -222,7 +222,7 @@
     {#if preview}
       <div
         class="preview-panel"
-        style="top:{preview.top}px; inset-inline-start:{preview.left}px; width:{preview.width}px"
+        style="top:{preview.top}px; left:{preview.left}px; width:{preview.width}px"
         onmouseenter={cancelHide}
         onmouseleave={hidePreviewSoon}
       >
