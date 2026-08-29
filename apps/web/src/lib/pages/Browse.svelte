@@ -9,6 +9,7 @@
   let totalPages = $state(1);
   let loading = $state(true);
   let loadingMore = $state(false);
+  let hasMore = $state(true);
   let error = $state('');
 
   // Pagination lives OUTSIDE reactivity on purpose: writing `page` inside
@@ -26,6 +27,7 @@
     currentPage = 0;
     totalPages = 1;
     error = '';
+    hasMore = true;
     load();
   }
 
@@ -37,7 +39,8 @@
       const d = await api.browseList(listId, next);
       if (mySeq !== seq) return; // superseded by a newer load
       title = d.title || title;
-      totalPages = d.totalPages || 1;
+      totalPages = d.totalPages ?? d.total_pages ?? 1;
+      hasMore = next < totalPages;
       items = [...items, ...(d.items || [])];
       currentPage = next;
     } catch (e) {
@@ -71,7 +74,7 @@
 
     {#if loading && items.length === 0}
       <p class="loading">جارٍ التحميل…</p>
-    {:else if page < totalPages}
+    {:else if hasMore}
       <div class="more-wrap">
         <button type="button" class="load-more" disabled={loadingMore} onclick={loadMore}>
           {loadingMore ? 'جارٍ التحميل…' : 'تحميل المزيد'}

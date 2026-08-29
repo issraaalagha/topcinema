@@ -48,7 +48,7 @@ export async function onRequest(context) {
       const meta = LISTS[listId];
       const { items, totalPages } = await meta.load(env, page);
       return jsonResponse(
-        { items, page, total_pages: totalPages, list: listId, title: meta.title },
+        { items, page, total_pages: totalPages, totalPages, list: listId, title: meta.title },
         200,
         300
       );
