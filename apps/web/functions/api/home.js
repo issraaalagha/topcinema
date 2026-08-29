@@ -2,7 +2,25 @@
 // Response shape matches the legacy scraper contract: { rows: [...] }.
 
 import { jsonResponse, CORS_HEADERS } from './_utils.js';
-import { tmdbFetch, mapListItem, mergeListTitles } from './_tmdb.js';
+import { tmdbFetch, mapListItem, mergeListTitles, hasCJK } from './_tmdb.js';
+
+    // Anime airing TODAY: /tv/airing_today ignores genre filters, so fetch
+    // 3 pages and filter client-side for Animation + Japanese origin.
+    async function animeAiringToday(env) {
+      const pages = await Promise.all(
+        [1, 2, 3].map((pg) =>
+          tmdbFetch(env, '/tv/airing_today', { page: pg }, 'ar').catch(() => ({ results: [] }))
+        )
+      );
+      const seen = new Set();
+      const out = [];
+      for (const r of pages.flatMap((p) => p.results || [])) {
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+        if ((r.genre_ids || []).includes(16) && r.original_language === 'ja') out.push(r);
+      }
+      return { results: out };
+    }
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -18,7 +36,7 @@ export async function onRequest(context) {
       with_original_language: 'ja',
       'vote_average.gte': 6.5,
     };
-    const [trendingAll, trendingMovies, onTheAir, topMovies, topAnime, newAnime] = await Promise.all([
+    const [trendingAll, trendingMovies, onTheAir, topMovies, topAnime, newAnime, airingAnime] = await Promise.all([
       tmdbFetch(env, '/trending/all/week', {}, 'ar').catch(() => ({ results: [] })),
       tmdbFetch(env, '/movie/popular', { page: 1 }, 'ar').catch(() => ({ results: [] })),
       tmdbFetch(env, '/tv/on_the_air', { page: 1 }, 'ar').catch(() => ({ results: [] })),
@@ -29,6 +47,7 @@ export async function onRequest(context) {
       tmdbFetch(env, '/discover/tv', { ...animeParams, sort_by: 'first_air_date.desc' }, 'ar')
         .then(async (ar) => mergeListTitles(ar.results || [], (await tmdbFetch(env, '/discover/tv', { ...animeParams, sort_by: 'first_air_date.desc' }, 'en').catch(() => ({ results: [] }))).results || []))
         .catch(() => []),
+      animeAiringToday(env).catch(() => ({ results: [] })),
     ]);
 
     const all = (list, type) =>
@@ -47,6 +66,14 @@ export async function onRequest(context) {
         id: 'anime-hot',
         title: 'أنمي الياباني الأنجح 🎌',
         items: (topAnime || [])
+          .map((r) => mapListItem(r, 'tv'))
+          .filter((i) => i.title && i.poster)
+          .slice(0, 18),
+      },
+      {
+        id: 'anime-airing',
+        title: 'حلقات الأنمي الجديدة اليوم ⚡',
+        items: (airingAnime.results || [])
           .map((r) => mapListItem(r, 'tv'))
           .filter((i) => i.title && i.poster)
           .slice(0, 18),

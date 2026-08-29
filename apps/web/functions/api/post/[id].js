@@ -102,6 +102,7 @@ export async function onRequest(context) {
       episode: parsed.episode,
       seasons,
       title,
+      original_title: details.original_title || title,
       poster: imgUrl(details.poster_path, 'w500'),
       backdrop: imgUrl(details.backdrop_path, 'w780'),
       quality: 'HD 1080',
