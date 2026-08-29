@@ -9,10 +9,12 @@
 
   $effect(() => {
     if (!item?.id) return;
+    loading = true;
     api
       .post(item.id)
       .then((d) => (details = d.post || null))
-      .catch(() => (details = null));
+      .catch(() => (details = null))
+      .finally(() => (loading = false));
   });
 
   $effect(() => {
