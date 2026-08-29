@@ -3,6 +3,7 @@
 
 import { jsonResponse, CORS_HEADERS } from './_utils.js';
 import { tmdbFetch, mapListItem, mergeListTitles, TMDB_GENRE_IDS } from './_tmdb.js';
+import { LISTS } from './_lists.js';
 
 /**
  * Real Japanese anime: Animation genre + Japanese origin language.
@@ -40,6 +41,18 @@ export async function onRequest(context) {
 
   try {
     let data;
+
+    // Full browse pages for shared home lists (e.g. anime-new, anime-airing)
+    const listId = url.searchParams.get('list');
+    if (listId && LISTS[listId]) {
+      const meta = LISTS[listId];
+      const { items, totalPages } = await meta.load(env, page);
+      return jsonResponse(
+        { items, page, total_pages: totalPages, list: listId, title: meta.title },
+        200,
+        300
+      );
+    }
 
     if (q) {
       // Multi-search covers movies + TV in one call

@@ -50,6 +50,8 @@ export const api = {
   post: (id) => request(`${BASE}/post/${encodeURIComponent(id)}`),
   resolve: (id, server) => request(`${BASE}/resolve/${encodeURIComponent(id)}/${encodeURIComponent(server)}?_cb=${Date.now()}`),
   getEpisodes: (tmdbId, season) => request(`${BASE}/episodes/${tmdbId}/${season}`),
+  browseList: (listId, page = 1) =>
+    request(`${BASE}/catalog?list=${encodeURIComponent(listId)}&page=${page}`),
 
   // Auth
   login: async (identifier, secret, remember = true) => {

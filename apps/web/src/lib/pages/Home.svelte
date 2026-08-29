@@ -235,6 +235,7 @@
       title={row.id === 'trending' ? 'أفضل 10 الأكثر رواجاً 🔥' : row.title}
       items={row.id === 'trending' ? row.items.slice(0, 10) : row.items}
       variant={row.id === 'trending' ? 'ranked' : 'row'}
+      listHref={'/browse/' + row.id}
     />
   {/each}
 {/if}

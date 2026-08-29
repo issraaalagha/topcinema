@@ -4,6 +4,7 @@
   import Admin from './lib/pages/Admin.svelte';
   import TV from './lib/pages/TV.svelte';
   import Account from './lib/pages/Account.svelte';
+  import Browse from './lib/pages/Browse.svelte';
   import Login from './lib/components/Login.svelte';
   import SearchOverlay from './lib/components/SearchOverlay.svelte';
   import { getWatchlist, syncFromCloud } from './lib/store.js';
@@ -159,6 +160,8 @@
     if (p === '/admin') return { page: 'admin' };
     if (p === '/tv') return { page: 'tv' };
     if (p === '/account') return { page: 'account' };
+    const browseMatch = p.match(/^\/browse\/([a-z-]+)$/);
+    if (browseMatch) return { page: 'browse', listId: browseMatch[1] };
     return { page: 'home', tab: 'all' };
   });
 
@@ -324,6 +327,8 @@
     <TV />
   {:else if route.page === 'account'}
     <Account />
+  {:else if route.page === 'browse'}
+    <Browse listId={route.listId} />
   {:else if route.page === 'home'}
     <Home initialTab={route.tab} />
   {:else if route.page === 'watch'}

@@ -1,7 +1,7 @@
 <script>
   import { isInWatchlist, toggleWatchlist } from '../store.js';
 
-  let { title, items = [], isContinueWatching = false, variant = 'row' } = $props();
+  let { title, items = [], isContinueWatching = false, variant = 'row', listHref = '' } = $props();
 
   // Scroll-reveal (IntersectionObserver, reduced-motion aware)
   let sectionEl = $state();
@@ -82,7 +82,18 @@
 {#if items && items.length > 0}
   <section class="row" class:revealed bind:this={sectionEl} aria-label={title}>
     <div class="row-header">
-      <h2>{title}</h2>
+      <h2>
+        {#if listHref}
+          <a class="row-title-link" href={listHref}>
+            {title}
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+              <path d="M14.71 5.71l-.71.71 4.3 4.29H2v2h16.3l-4.3 4.29.71.71 5.29-5.29z" transform="scale(-1,1) translate(-24,0)"/>
+            </svg>
+          </a>
+        {:else}
+          {title}
+        {/if}
+      </h2>
       <div class="nav-arrows">
         <button
           type="button"
@@ -426,6 +437,19 @@
     position: relative;
     padding-inline-start: 14px;
     letter-spacing: -0.3px;
+  }
+  .row-title-link {
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color var(--transition-fast);
+  }
+  .row-title-link:hover {
+    color: var(--accent);
+  }
+  .row-title-link:hover svg {
+    color: var(--accent);
   }
   h2::before {
     content: '';
