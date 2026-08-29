@@ -27,9 +27,7 @@
 
   // Per-episode identity for TV: tv-108978-1-5 → resolve/history per episode
   const isTv = $derived(data?.post?.type === 'tv');
-  const isAnimeTitle = $derived(
-    !!data?.post?.tmdbId && !!(data.post.genres || []).some((g) => g.includes('أنمي'))
-  );
+
   const effectiveId = $derived(
     isTv && selectedSeason && selectedEpisode
       ? `tv-${data.post.tmdbId}-${selectedSeason}-${selectedEpisode}`
@@ -371,16 +369,6 @@
             </button>
           {/each}
         </div>
-        {#if isAnimeTitle}
-          <a
-            class="subtitle-download"
-            href={'https://9anime.com.lv/search?keyword=' + encodeURIComponent(data.post.original_title || data.post.title)}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            🌐 مصدر أنمي إضافي — ابحث عنه على 9anime (تبويب جديد)
-          </a>
-        {/if}
         {#if stream && data.post.type && data.post.tmdbId}
           <a
             class="subtitle-download"
