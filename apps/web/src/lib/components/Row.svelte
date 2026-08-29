@@ -1,7 +1,10 @@
 <script>
   import { isInWatchlist, toggleWatchlist } from '../store.js';
+  import DetailsModal from './DetailsModal.svelte';
 
   let { title, items = [], isContinueWatching = false, variant = 'row', listHref = '' } = $props();
+
+  let detailsItem = $state(null);
 
   // Scroll-reveal (IntersectionObserver, reduced-motion aware)
   let sectionEl = $state();
@@ -139,7 +142,14 @@
             <p class="name">{it.title}</p>
           </a>
         {:else}
-        <a class="card" href={'/watch/' + it.id} onmouseenter={(e) => showPreview(e, it)} onmouseleave={hidePreviewSoon}>
+        <a
+          class="card"
+          href={'/watch/' + it.id}
+          data-modal-link="1"
+          onclick={(e) => { e.preventDefault(); detailsItem = it; }}
+          onmouseenter={(e) => showPreview(e, it)}
+          onmouseleave={hidePreviewSoon}
+        >
           <div class="poster-wrap">
             <img
               loading="lazy"
@@ -216,6 +226,9 @@
         onmouseenter={cancelHide}
         onmouseleave={hidePreviewSoon}
       >
+        {#if variant === 'ranked'}
+          <span class="p-top10">TOP&nbsp;10</span>
+        {/if}
         <img class="p-back" src={preview.item.backdrop || preview.item.poster || '/icons/icon.svg'} alt="" />
         <div class="p-body">
           <div class="p-title-row">
@@ -238,9 +251,22 @@
             <button type="button" class="p-add" onclick={(e) => togglePreviewList(e, preview.item)}>
               + قائمتي
             </button>
+            <button
+              type="button"
+              class="p-info"
+              aria-label="تفاصيل"
+              title="تفاصيل"
+              onclick={() => { const it = preview?.item; preview = null; if (it) detailsItem = it; }}
+            >
+              ⓘ
+            </button>
           </div>
         </div>
       </div>
+    {/if}
+
+    {#if detailsItem}
+      <DetailsModal item={detailsItem} onClose={() => (detailsItem = null)} />
     {/if}
   </section>
 {/if}
@@ -410,6 +436,34 @@
   }
   .p-add:hover {
     background: rgba(255, 255, 255, 0.16);
+  }
+  .p-info {
+    min-width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: Georgia, serif;
+  }
+  .p-info:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+  .p-top10 {
+    position: absolute;
+    top: 0;
+    inset-inline-start: 0;
+    z-index: 3;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border-radius: 0 0 8px 0;
   }
 
   @media (prefers-reduced-motion: reduce) {

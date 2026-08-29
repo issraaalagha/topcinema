@@ -131,6 +131,8 @@
   function handleLinkClick(e) {
     const anchor = e.target.closest('a');
     if (!anchor) return;
+    // Cards that open the details modal manage their own click behavior
+    if (anchor.hasAttribute('data-modal-link')) return;
     const href = anchor.getAttribute('href');
     if (href && (href.startsWith('/') || href.startsWith('#/'))) {
       e.preventDefault();
