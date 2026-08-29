@@ -1,4 +1,5 @@
 import { jsonResponse, CORS_HEADERS } from '../_utils.js';
+import { getSession, hasRole } from '../_auth.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -10,6 +11,17 @@ export async function onRequest(context) {
   const db = env?.DB;
   const url = new URL(request.url);
   const profileId = url.searchParams.get('profile') || 'default';
+
+  // Privacy: users access only their own profile; admins access any.
+  const session = await getSession(request, env);
+  if (!session) {
+    return jsonResponse({ ok: false, error: 'يرجى تسجيل الدخول' }, 401);
+  }
+  const isOwn =
+    profileId === session.sub || (session.sub === 'owner' && profileId === 'default');
+  if (!isOwn && !hasRole(session, 'admin')) {
+    return jsonResponse({ ok: false, error: 'لا تملك صلاحية الوصول لبيانات مستخدم آخر' }, 403);
+  }
 
   if (!db) {
     return jsonResponse({

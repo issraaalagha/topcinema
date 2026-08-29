@@ -508,6 +508,12 @@
     padding: 24px;
     align-items: start;
   }
+  /* Grid items must be allowed to shrink — without this, the collection
+     row's min-content forced the player column past the viewport */
+  .player-col,
+  .info-col {
+    min-width: 0;
+  }
   .player-wrapper {
     width: 100%;
     border-radius: var(--radius-md);

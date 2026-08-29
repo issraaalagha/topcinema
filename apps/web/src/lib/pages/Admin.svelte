@@ -19,6 +19,10 @@
   // reset password modal state
   let resetTarget = $state(null);
   let resetPass = $state('');
+  let contentTab = $state('users');
+  let contentUser = $state('');
+  let contentData = $state(null);
+  let contentLoading = $state(false);
 
   const isOwner = $derived(role === 'owner');
 
@@ -33,6 +37,30 @@
       error = e.message;
     } finally {
       loading = false;
+    }
+  }
+
+  async function loadContent() {
+    if (!contentUser) return;
+    contentLoading = true;
+    try {
+      contentData = await api.adminContent(contentUser);
+    } catch (e) {
+      error = e.message;
+    } finally {
+      contentLoading = false;
+    }
+  }
+
+  async function adminRemove(kind, id) {
+    try {
+      const r = await api.adminDeleteContent(contentUser, kind, id);
+      if (r.ok) {
+        flash('🗑️ ' + r.message);
+        await loadContent();
+      } else error = r.error;
+    } catch (e) {
+      error = e.message;
     }
   }
 
@@ -132,6 +160,9 @@
     <button type="button" class="tab" class:active={tab === 'stats'} onclick={() => (tab = 'stats')}>
       إحصائيات
     </button>
+    <button type="button" class="tab" class:active={tab === 'content'} onclick={() => (tab = 'content')}>
+      إدارة المحتوى
+    </button>
   </div>
 
   {#if message}
@@ -218,6 +249,53 @@
         </form>
       </div>
     {/if}
+  {:else if tab === 'content'}
+    <div class="create-card">
+      <h3>🗂️ إدارة مفضلة وسجل المستخدمين</h3>
+      <div class="create-row">
+        <select bind:value={contentUser} onchange={() => { contentData = null; if (contentUser) loadContent(); }}>
+          <option value="" disabled selected>اختر مستخدماً…</option>
+          {#each users as u (u.id)}
+            <option value={u.username}>{u.username} {u.active ? '' : '(معطل)'}</option>
+          {/each}
+        </select>
+      </div>
+
+      {#if contentLoading}
+        <p class="loading">جارٍ التحميل…</p>
+      {:else if contentData}
+        {#if contentData.favorites?.length}
+          <h4>المفضلة ({contentData.favorites.length}) <button type="button" class="mini danger" onclick={() => adminRemove('favorites', '')}>مسح الكل</button></h4>
+          <div class="c-list">
+            {#each contentData.favorites as f (f.item_id)}
+              <div class="c-row">
+                <span class="c-title">{f.title}</span>
+                <button type="button" class="mini danger" onclick={() => adminRemove('favorites', f.item_id)}>حذف</button>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <p class="c-empty">لا مفضلة لهذا المستخدم</p>
+        {/if}
+
+        {#if contentData.history?.length}
+          <h4>سجل المشاهدة ({contentData.history.length}) <button type="button" class="mini danger" onclick={() => adminRemove('history', '')}>مسح الكل</button></h4>
+          <div class="c-list">
+            {#each contentData.history as h (h.item_id)}
+              <div class="c-row">
+                <span class="c-title">{h.title}</span>
+                <span class="c-pct">{h.percent || 0}%</span>
+                <button type="button" class="mini danger" onclick={() => adminRemove('history', h.item_id)}>حذف</button>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <p class="c-empty">لا سجل مشاهدة لهذا المستخدم</p>
+        {/if}
+      {:else}
+        <p class="c-empty">اختر مستخدماً لعرض محتواه</p>
+      {/if}
+    </div>
   {:else if tab === 'stats'}
     <div class="stats-grid">
       <div class="stat-card">
@@ -457,6 +535,46 @@
   }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
+  .c-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+  .c-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-sm);
+    padding: 9px 12px;
+  }
+  .c-title {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .c-pct {
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .c-empty {
+    color: var(--text-muted);
+    font-size: 13.5px;
+    padding: 8px 0 16px;
+  }
+  .create-card h4 {
+    font-size: 13.5px;
+    margin: 14px 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

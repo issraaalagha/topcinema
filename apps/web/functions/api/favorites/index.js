@@ -1,4 +1,5 @@
 import { jsonResponse, CORS_HEADERS } from '../_utils.js';
+import { getSession, hasRole } from '../_auth.js';
 
 function detectItemType(item) {
   if (item.item_type) return item.item_type;
@@ -24,6 +25,17 @@ export async function onRequest(context) {
   const db = env?.DB;
   const url = new URL(request.url);
   const profileId = url.searchParams.get('profile') || 'default';
+
+  // Privacy: users access only their own profile; admins access any.
+  const session = await getSession(request, env);
+  if (!session) {
+    return jsonResponse({ ok: false, error: 'يرجى تسجيل الدخول' }, 401);
+  }
+  const isOwn =
+    profileId === session.sub || (session.sub === 'owner' && profileId === 'default');
+  if (!isOwn && !hasRole(session, 'admin')) {
+    return jsonResponse({ ok: false, error: 'لا تملك صلاحية الوصول لبيانات مستخدم آخر' }, 403);
+  }
   const filterType = url.searchParams.get('type') || ''; // 'movie' | 'series' | 'anime' | ''
 
   // Fallback memory state if DB binding is not present
@@ -101,7 +113,9 @@ export async function onRequest(context) {
     if (request.method === 'DELETE') {
       const itemId = url.searchParams.get('id');
       if (!itemId) {
-        return jsonResponse({ ok: false, error: 'Missing item id' }, 400);
+        // Clear all favorites for this profile
+        await db.prepare('DELETE FROM favorites WHERE profile_id = ?').bind(profileId).run();
+        return jsonResponse({ ok: true, message: 'Favorites cleared' });
       }
 
       await db

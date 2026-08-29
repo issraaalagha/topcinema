@@ -3,6 +3,7 @@
   import Watch from './lib/pages/Watch.svelte';
   import Admin from './lib/pages/Admin.svelte';
   import TV from './lib/pages/TV.svelte';
+  import Account from './lib/pages/Account.svelte';
   import Login from './lib/components/Login.svelte';
   import SearchOverlay from './lib/components/SearchOverlay.svelte';
   import { getWatchlist, syncFromCloud } from './lib/store.js';
@@ -157,6 +158,7 @@
     if (p === '/watchlist') return { page: 'home', tab: 'watchlist' };
     if (p === '/admin') return { page: 'admin' };
     if (p === '/tv') return { page: 'tv' };
+    if (p === '/account') return { page: 'account' };
     return { page: 'home', tab: 'all' };
   });
 
@@ -281,6 +283,11 @@
       {/if}
 
       {#if isAuthenticated}
+        <a href="/account" class="account-btn {currentLoc.path === '/account' ? 'active' : ''}" title="حسابي" aria-label="حسابي">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+        </a>
         {#if canAdmin}
           <a href="/admin" class="admin-btn {isAdminRoute ? 'active' : ''}" title="لوحة التحكم" aria-label="لوحة التحكم">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor">
@@ -315,6 +322,8 @@
     {/if}
   {:else if route.page === 'tv'}
     <TV />
+  {:else if route.page === 'account'}
+    <Account />
   {:else if route.page === 'home'}
     <Home initialTab={route.tab} />
   {:else if route.page === 'watch'}
@@ -518,6 +527,22 @@
     background: rgba(239, 68, 68, 0.2);
     border-color: rgba(239, 68, 68, 0.4);
     transform: scale(1.08);
+  }
+  .account-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-glass);
+    color: var(--text);
+    display: grid;
+    place-items: center;
+    transition: all var(--transition-fast);
+  }
+  .account-btn:hover,
+  .account-btn.active {
+    border-color: rgba(59, 130, 246, 0.5);
+    background: rgba(59, 130, 246, 0.15);
   }
   .admin-btn {
     width: 36px;

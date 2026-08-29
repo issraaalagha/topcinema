@@ -1,5 +1,10 @@
 const BASE = '/api';
 
+// Per-account data: favorites/history live under the logged-in username
+export function myProfile() {
+  return localStorage.getItem('tc_username') || 'default';
+}
+
 export function getAuthToken() {
   return localStorage.getItem('tc_auth_token') || '';
 }
@@ -75,35 +80,44 @@ export const api = {
   deleteUser: (id) =>
     request(`${BASE}/auth/users?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
   getStats: () => request(`${BASE}/auth/stats`),
+  adminContent: (user) =>
+    request(`${BASE}/admin/content?user=${encodeURIComponent(user)}`),
+  adminDeleteContent: (user, kind, id = '') =>
+    request(
+      `${BASE}/admin/content?user=${encodeURIComponent(user)}&kind=${kind}${id ? '&id=' + encodeURIComponent(id) : ''}`,
+      { method: 'DELETE' }
+    ),
+  clearFavorites: (profile = myProfile()) =>
+    request(`${BASE}/favorites?profile=${encodeURIComponent(profile)}`, { method: 'DELETE' }),
 
   // Cloud D1 Favorites (Categorized)
-  getFavorites: (type = '', profile = 'default') => {
+  getFavorites: (type = '', profile = myProfile()) => {
     const p = new URLSearchParams({ profile });
     if (type) p.set('type', type);
     return request(`${BASE}/favorites?${p}`);
   },
-  addFavorite: (item, profile = 'default') =>
+  addFavorite: (item, profile = myProfile()) =>
     request(`${BASE}/favorites?profile=${profile}`, {
       method: 'POST',
       body: JSON.stringify(item),
     }),
-  removeFavorite: (id, profile = 'default') =>
+  removeFavorite: (id, profile = myProfile()) =>
     request(`${BASE}/favorites?id=${encodeURIComponent(id)}&profile=${profile}`, {
       method: 'DELETE',
     }),
 
   // Cloud D1 History
-  getHistory: (profile = 'default') => request(`${BASE}/history?profile=${profile}`),
-  saveProgress: (item, profile = 'default') =>
+  getHistory: (profile = myProfile()) => request(`${BASE}/history?profile=${profile}`),
+  saveProgress: (item, profile = myProfile()) =>
     request(`${BASE}/history?profile=${profile}`, {
       method: 'POST',
       body: JSON.stringify(item),
     }),
-  clearHistory: (id = '', profile = 'default') => {
+  clearHistory: (id = '', profile = myProfile()) => {
     const q = id ? `?id=${encodeURIComponent(id)}&profile=${profile}` : `?profile=${profile}`;
     return request(`${BASE}/history${q}`, { method: 'DELETE' });
   },
 
   // Recommendations
-  getRecommendations: (profile = 'default') => request(`${BASE}/recommendations?profile=${profile}`),
+  getRecommendations: (profile = myProfile()) => request(`${BASE}/recommendations?profile=${profile}`),
 };
