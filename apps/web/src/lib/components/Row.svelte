@@ -3,6 +3,67 @@
 
   let { title, items = [], isContinueWatching = false, variant = 'row' } = $props();
 
+  // Scroll-reveal (IntersectionObserver, reduced-motion aware)
+  let sectionEl = $state();
+  let revealed = $state(false);
+  $effect(() => {
+    if (!sectionEl) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      revealed = true;
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          revealed = true;
+          io.disconnect();
+        }
+      },
+      { rootMargin: '60px' }
+    );
+    io.observe(sectionEl);
+    return () => io.disconnect();
+  });
+
+  // Desktop hover preview card (Netflix-style expand)
+  let preview = $state(null);
+  let previewTimer = null;
+  let hideTimer = null;
+
+  function canHover() {
+    return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  }
+  function showPreview(e, it) {
+    if (!canHover() || variant === 'ranked') return;
+    clearTimeout(hideTimer);
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      const card = e.currentTarget;
+      const r = card.getBoundingClientRect();
+      const panelW = Math.min(340, Math.round(r.width * 1.6));
+      const left = Math.max(10, Math.min(r.left - (panelW - r.width) / 2, window.innerWidth - panelW - 10));
+      const top = Math.max(74, Math.min(r.top - 40, window.innerHeight - 390));
+      preview = { item: it, top, left, width: panelW };
+    }, 420);
+  }
+  function cancelHide() {
+    clearTimeout(hideTimer);
+  }
+  function hidePreviewSoon() {
+    clearTimeout(previewTimer);
+    hideTimer = setTimeout(() => (preview = null), 140);
+  }
+  function hidePreviewNow() {
+    clearTimeout(previewTimer);
+    preview = null;
+  }
+  function togglePreviewList(e, it) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleWatchlist(it);
+    preview = preview ? { ...preview, saved: undefined } : null;
+  }
+
   let trackEl = $state();
 
   function scroll(dir) {
@@ -19,7 +80,7 @@
 </script>
 
 {#if items && items.length > 0}
-  <section class="row" aria-label={title}>
+  <section class="row" class:revealed bind:this={sectionEl} aria-label={title}>
     <div class="row-header">
       <h2>{title}</h2>
       <div class="nav-arrows">
@@ -46,9 +107,27 @@
       </div>
     </div>
 
-    <div class="track" class:grid={variant === 'grid'} bind:this={trackEl}>
+    <div class="track" class:grid={variant === 'grid'} class:ranked={variant === 'ranked'} onscroll={hidePreviewNow} bind:this={trackEl}>
       {#each items as it, idx (`${it.id || ''}_${idx}`)}
-        <a class="card" href={'/watch/' + it.id}>
+        {#if variant === 'ranked'}
+          <a class="ranked-card" href={'/watch/' + it.id}>
+            <span class="rank-num">{idx + 1}</span>
+            <div class="rank-poster">
+              <img
+                loading="lazy"
+                src={it.poster || '/icons/icon.svg'}
+                alt={it.title}
+                width="130"
+                height="195"
+              />
+              {#if it.kind}
+                <span class="kind-badge kind-{it.type}">{it.kind}</span>
+              {/if}
+            </div>
+            <p class="name">{it.title}</p>
+          </a>
+        {:else}
+        <a class="card" href={'/watch/' + it.id} onmouseenter={(e) => showPreview(e, it)} onmouseleave={hidePreviewSoon}>
           <div class="poster-wrap">
             <img
               loading="lazy"
@@ -110,8 +189,43 @@
             {[it.genres?.slice(0, 2).join(' • '), it.year].filter(Boolean).join(' • ') || it.kind || ''}
           </p>
         </a>
+        {/if}
       {/each}
     </div>
+
+    {#if preview}
+      <div
+        class="preview-panel"
+        style="top:{preview.top}px; inset-inline-start:{preview.left}px; width:{preview.width}px"
+        onmouseenter={cancelHide}
+        onmouseleave={hidePreviewSoon}
+      >
+        <img class="p-back" src={preview.item.backdrop || preview.item.poster || '/icons/icon.svg'} alt="" />
+        <div class="p-body">
+          <div class="p-title-row">
+            {#if preview.item.kind}<span class="p-kind">{preview.item.kind}</span>{/if}
+            {#if preview.item.rating}<span class="p-rating">{preview.item.rating} ★</span>{/if}
+            {#if preview.item.year}<span class="p-year">{preview.item.year}</span>{/if}
+          </div>
+          <h4 class="p-title">{preview.item.title}</h4>
+          {#if preview.item.genres?.length}
+            <p class="p-genres">{preview.item.genres.slice(0, 3).join(' • ')}</p>
+          {/if}
+          {#if preview.item.story}
+            <p class="p-story">{preview.item.story}</p>
+          {/if}
+          <div class="p-actions">
+            <a class="p-play" href={'/watch/' + preview.item.id} onclick={hidePreviewNow}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              تشغيل
+            </a>
+            <button type="button" class="p-add" onclick={(e) => togglePreviewList(e, preview.item)}>
+              + قائمتي
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
   </section>
 {/if}
 
@@ -119,6 +233,181 @@
   .row {
     margin: 28px 0 10px;
     position: relative;
+  /* Scroll-reveal */
+  .row:not(.revealed) {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  .row.revealed {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.55s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* ── Ranked (Top 10) variant ── */
+  .track.ranked {
+    align-items: flex-end;
+    gap: 0;
+  }
+  .ranked-card {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-end;
+    position: relative;
+    text-decoration: none;
+    scroll-snap-align: start;
+    padding: 4px 2px 10px;
+  }
+  .rank-num {
+    font-size: 148px;
+    font-weight: 900;
+    line-height: 0.76;
+    letter-spacing: -10px;
+    color: #07090e;
+    -webkit-text-stroke: 3px rgba(255, 255, 255, 0.42);
+    margin-inline-end: -24px;
+    z-index: 0;
+    user-select: none;
+    font-family: 'Arial Black', 'Alexandria', sans-serif;
+  }
+  .rank-poster {
+    position: relative;
+    z-index: 1;
+    width: 132px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-glass);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  }
+  .ranked-card:hover .rank-poster {
+    transform: translateY(-6px) scale(1.04);
+    box-shadow: var(--shadow-lg);
+  }
+  .rank-poster img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+    display: block;
+  }
+  .ranked-card .name {
+    position: absolute;
+    bottom: -4px;
+    inset-inline-end: 6px;
+    max-width: 120px;
+    z-index: 2;
+    display: none;
+  }
+
+  /* ── Hover preview panel ── */
+  .preview-panel {
+    position: fixed;
+    z-index: 250;
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(18, 20, 26, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8);
+    animation: panel-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+    pointer-events: auto;
+  }
+  @keyframes panel-in {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .p-back {
+    width: 100%;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    display: block;
+  }
+  .p-body {
+    padding: 12px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .p-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+  }
+  .p-kind {
+    color: #60a5fa;
+  }
+  .p-rating {
+    color: #f5c518;
+  }
+  .p-year {
+    color: var(--text-muted);
+  }
+  .p-title {
+    font-size: 15.5px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.3;
+  }
+  .p-genres {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .p-story {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .p-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 2px;
+  }
+  .p-play {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+  .p-play:hover {
+    background: #ff1a26;
+  }
+  .p-add {
+    padding: 8px 14px;
+    border-radius: var(--radius-pill);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .p-add:hover {
+    background: rgba(255, 255, 255, 0.16);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .row:not(.revealed) {
+      opacity: 1;
+      transform: none;
+    }
+    .row.revealed {
+      transition: none;
+    }
+    .preview-panel {
+      animation: none;
+    }
+  }
   }
   .row-header {
     display: flex;
@@ -387,6 +676,19 @@
     }
     .card {
       flex: 0 0 126px;
+    }
+    .ranked-card {
+      flex: 0 0 auto;
+      padding: 2px 0 8px;
+    }
+    .rank-num {
+      font-size: 96px;
+      letter-spacing: -6px;
+      margin-inline-end: -16px;
+      -webkit-text-stroke-width: 2px;
+    }
+    .rank-poster {
+      width: 100px;
     }
     .track.grid {
       grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));

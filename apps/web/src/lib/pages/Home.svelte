@@ -231,7 +231,11 @@
 
   <!-- Categorized Rows -->
   {#each rows as row, idx (`${row.id || ''}_${idx}`)}
-    <Row title={row.title} items={row.items} />
+    <Row
+      title={row.id === 'trending' ? 'أفضل 10 الأكثر رواجاً 🔥' : row.title}
+      items={row.id === 'trending' ? row.items.slice(0, 10) : row.items}
+      variant={row.id === 'trending' ? 'ranked' : 'row'}
+    />
   {/each}
 {/if}
 

@@ -331,6 +331,27 @@
   {/if}
 </main>
 
+{#if isAuthenticated && route.page !== 'tv' && route.page !== 'admin'}
+  <nav class="bottom-nav" aria-label="التنقل السريع">
+    <a href="/" class="bn-item {currentLoc.path === '/' ? 'active' : ''}">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg>
+      <span>الرئيسية</span>
+    </a>
+    <button type="button" class="bn-item" class:active={searchOpen} onclick={() => (searchOpen = true)}>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 14z"/></svg>
+      <span>تصفح</span>
+    </button>
+    <a href="/watchlist" class="bn-item {currentLoc.path === '/watchlist' ? 'active' : ''}">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-4.5 7 4.5V5c0-1.1-.9-2-2-2z"/></svg>
+      <span>قائمتي</span>
+    </a>
+    <a href="/account" class="bn-item {currentLoc.path === '/account' ? 'active' : ''}">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      <span>حسابي</span>
+    </a>
+  </nav>
+{/if}
+
 {#if route.page !== 'tv'}
 <footer class="app-footer">
   <div class="footer-content">
@@ -544,6 +565,11 @@
     border-color: rgba(59, 130, 246, 0.5);
     background: rgba(59, 130, 246, 0.15);
   }
+  /* ── Mobile bottom navigation (Netflix pattern) ── */
+  .bottom-nav {
+    display: none;
+  }
+
   .admin-btn {
     width: 36px;
     height: 36px;
@@ -612,6 +638,46 @@
   }
 
   @media (max-width: 768px) {
+    main {
+      padding-bottom: 62px;
+    }
+    .nav-links {
+      display: none;
+    }
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 150;
+      display: flex;
+      justify-content: space-around;
+      padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+      background: rgba(10, 12, 17, 0.96);
+      backdrop-filter: blur(14px);
+      border-top: 1px solid var(--border-glass);
+    }
+    .bn-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      min-width: 64px;
+      min-height: 44px;
+      justify-content: center;
+      padding: 4px 6px;
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 10.5px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .bn-item.active {
+      color: var(--accent);
+    }
     .topbar {
       padding: 10px 12px;
     }
