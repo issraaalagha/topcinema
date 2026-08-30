@@ -32,8 +32,10 @@
   }
 
   function go() {
+    if (!item) return;
+    const target = '/watch/' + item.id; // capture BEFORE onClose nulls props
     onClose?.();
-    window.history.pushState(null, '', '/watch/' + item.id);
+    window.history.pushState(null, '', target);
     window.dispatchEvent(new PopStateEvent('popstate'));
   }
 </script>
