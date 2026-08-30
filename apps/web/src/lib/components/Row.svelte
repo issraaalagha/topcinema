@@ -222,7 +222,14 @@
     {#if preview}
       <div
         class="preview-panel"
-        style="top:{preview.top}px; left:{preview.left}px; width:{preview.width}px"
+        style="top:{preview.top}px; left:{preview.left}px; width:{preview.width}px; cursor: pointer"
+        onclick={(e) => {
+          if (e.target.closest('button, a')) return;
+          const it = preview?.item;
+          if (!it) return;
+          preview = null;
+          detailsItem = it;
+        }}
         onmouseenter={cancelHide}
         onmouseleave={hidePreviewSoon}
       >
