@@ -29,6 +29,7 @@ import os
 import re
 import socket
 import threading
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -148,6 +149,63 @@ def filter_hls_master(raw: str, wanted_height: int) -> str:
     out.append(best[1])
     out.append(best[2])
     return "\n".join(out) + "\n"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CineSrc permalink: /hls/<token>?cine=tv-92783-1-1&q=1080
+# Resolves the cinesrc embed page to its master playlist (cached), then
+# serves it filtered to a single quality + audio group.
+# ─────────────────────────────────────────────────────────────────────────────
+
+CINE_CACHE = {}  # embed_url -> (expires_epoch, master_url)
+CINE_CACHE_TTL = 2 * 3600
+FILTER_CACHE = {}  # (embed_url, q) -> (expires_epoch, filtered_text)
+FILTER_CACHE_TTL = 30 * 60
+
+
+def cinesrc_embed_from_composite(cine: str) -> str:
+    m = re.match(r"^(movie|tv)-(\d+)(?:-(\d+))?(?:-(\d+))?$", cine.strip())
+    if not m:
+        raise ValueError("invalid cine id (expected movie-<id> or tv-<id>-<s>-<e>)")
+    kind, tid, s, e = m.group(1), m.group(2), m.group(3), m.group(4)
+    if kind == "movie":
+        return f"https://cinesrc.st/embed/movie/{tid}"
+    return f"https://cinesrc.st/embed/tv/{tid}?s={s or 1}&e={e or 1}"
+
+
+def resolve_master_from_cine(embed_url: str) -> str:
+    now = time.time()
+    hit = CINE_CACHE.get(embed_url)
+    if hit and hit[0] > now:
+        return hit[1]
+    url, method = ENGINE.extract(embed_url)
+    if not url:
+        url, method = extract_with_requests(embed_url)
+    if not url:
+        raise ValueError("extraction failed")
+    CINE_CACHE[embed_url] = (now + CINE_CACHE_TTL, url)
+    return url
+
+
+def get_filtered_master(cine: str, wanted: int, referer: str) -> str:
+    now = time.time()
+    key = (cine, wanted)
+    hit = FILTER_CACHE.get(key)
+    if hit and hit[0] > now:
+        return hit[1]
+    embed_url = cinesrc_embed_from_composite(cine)
+    for attempt in (1, 2):
+        try:
+            master = resolve_master_from_cine(embed_url)
+            raw = fetch_hls_master(master, referer)
+            filtered = filter_hls_master(raw, wanted)
+            FILTER_CACHE[key] = (now + FILTER_CACHE_TTL, filtered)
+            return filtered
+        except (ValueError, requests.RequestException):
+            if attempt == 2:
+                raise
+            CINE_CACHE.pop(embed_url, None)  # stale master — re-extract once
+    raise ValueError("unreachable")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -361,7 +419,8 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/health":
             return self._send({"ok": True, "chromium": bool(ENGINE._browser)})
 
-        # /hls/<token>?url=<master.m3u8>&q=<height>&ref=<referer>
+        # /hls/<token>?cine=tv-92783-1-1&q=1080   (permalink — resolves + filters)
+        # /hls/<token>?url=<master.m3u8>&q=<height>&ref=<referer>  (direct)
         # Serves a filtered master playlist (one quality + audio group) for
         # cast apps. Path token auth: cast apps cannot send headers.
         if parsed.path.startswith("/hls/"):
@@ -370,15 +429,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send({"ok": False, "error": "unauthorized"}, 401)
 
             query = urllib.parse.parse_qs(parsed.query)
-            master_url = (query.get("url") or [""])[0]
-            wanted = int((query.get("q") or ["1080"])[0])
             referer = (query.get("ref") or ["https://cinesrc.st/"])[0]
-            if not master_url:
-                return self._send({"ok": False, "error": "missing url"}, 400)
+            wanted = int((query.get("q") or ["1080"])[0])
+            cine = (query.get("cine") or [""])[0]
+            master_url = (query.get("url") or [""])[0]
             try:
-                master_url = validate_public_url(master_url)
-                raw = fetch_hls_master(master_url, referer)
-                filtered = filter_hls_master(raw, wanted)
+                if cine:
+                    filtered = get_filtered_master(cine, wanted, referer)
+                elif master_url:
+                    master_url = validate_public_url(master_url)
+                    raw = fetch_hls_master(master_url, referer)
+                    filtered = filter_hls_master(raw, wanted)
+                else:
+                    return self._send({"ok": False, "error": "missing url or cine"}, 400)
             except (ValueError, requests.RequestException) as exc:
                 return self._send({"ok": False, "error": str(exc)}, 400)
             body = filtered.encode("utf-8")
