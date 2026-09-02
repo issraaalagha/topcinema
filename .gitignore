@@ -90,3 +90,6 @@ tools/
 
 # launcher for tunnel+extractor (runs services; keep local)
 start_all.cmd
+
+# local debug bundle dump
+bundled_test/
