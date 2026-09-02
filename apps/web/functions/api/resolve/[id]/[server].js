@@ -164,13 +164,22 @@ async function tryLocalExtractor(env, embedUrl, label) {
   if (!extractorBase) return null;
   try {
     const extractorUrl = `${extractorBase.replace(/\/$/, '')}/extract?url=${encodeURIComponent(embedUrl)}&server=${encodeURIComponent(label)}`;
-    // The extractor requires a shared bearer token (EXTRACTOR_TOKEN).
+    // The extractor sits behind Cloudflare Access (service auth) AND requires
+    // its own shared bearer token. Both credential sets come from secrets.
     const token = env?.EXTRACTOR_TOKEN || '';
+    const accessId = env?.CF_ACCESS_CLIENT_ID || '';
+    const accessSecret = env?.CF_ACCESS_CLIENT_SECRET || '';
     const extRes = await fetch(extractorUrl, {
       signal: AbortSignal.timeout(70000),
       headers: {
         'User-Agent': 'topcinema-pages-function',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(accessId && accessSecret
+          ? {
+              'CF-Access-Client-Id': accessId,
+              'CF-Access-Client-Secret': accessSecret,
+            }
+          : {}),
       },
     });
     if (!extRes.ok) return null;
