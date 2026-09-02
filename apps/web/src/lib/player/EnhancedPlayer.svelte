@@ -295,15 +295,16 @@
 <div class="enterprise-player-wrapper">
   {#if isEmbedFrame}
     <!-- Embedded host player (used when direct extraction is blocked upstream).
-         allow-scripts + allow-same-origin together would let the embed remove
-         its own sandbox; untrusted hosts get neither same-origin nor forms. -->
+         cinesrc.st's player requires same-origin access (localStorage/session)
+         to function at all — sandboxing it stricter renders "video
+         unavailable". This host is whitelisted server-side in resolve. -->
     <iframe
       class="embed-frame"
       src={embedSrc}
       title={title || 'مشغل الفيديو'}
       allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
       referrerpolicy="origin"
-      sandbox="allow-scripts allow-presentation"
+      sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
     ></iframe>
   {:else}
   <!-- Chromecast Floating Trigger Button -->
