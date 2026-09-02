@@ -48,14 +48,26 @@ export async function onRequest(context) {
   if (!tmdbId) return jsonResponse({ error: 'معرف غير صالح' }, 400);
 
   try {
+    const url = new URL(request.url);
+    const season = parseInt(url.searchParams.get('s') || '', 10);
+    const episode = parseInt(url.searchParams.get('e') || '', 10);
+
     // 1. Resolve IMDb id via TMDB
     const details = await tmdbFetch(env, `/${type}/${tmdbId}`, { append_to_response: 'external_ids' }, 'en');
     const imdbId = details.external_ids?.imdb_id;
     if (!imdbId) return jsonResponse({ error: 'لا يوجد IMDb ID لهذا العمل' }, 404);
 
-    // 2. Search Arabic subtitles
+    // 2. Search Arabic subtitles. For TV episodes the series imdb id alone
+    // returns nothing — target the episode via parent_imdb_id + season +
+    // episode (OpenSubtitles supports this natively).
     const searchUrl = new URL(`${OS_BASE}/subtitles`);
-    searchUrl.searchParams.set('imdb_id', imdbId.replace(/\D/g, ''));
+    if (type === 'tv' && season && episode) {
+      searchUrl.searchParams.set('parent_imdb_id', imdbId.replace(/\D/g, ''));
+      searchUrl.searchParams.set('season', String(season));
+      searchUrl.searchParams.set('episode', String(episode));
+    } else {
+      searchUrl.searchParams.set('imdb_id', imdbId.replace(/\D/g, ''));
+    }
     searchUrl.searchParams.set('languages', 'ar');
     searchUrl.searchParams.set('type', type);
     const searchRes = await fetch(searchUrl.toString(), { headers: osHeaders(key) });

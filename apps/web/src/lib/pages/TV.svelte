@@ -114,6 +114,8 @@
 
       const r = await api.resolve(it.id, it.id);
       if (r.ok && r.url) {
+        // Episode-targeted subtitles: it.id is tv-<tmdbId>-<season>-<episode>
+        const ep = (it.id || '').match(/^tv-\d+-(\d+)-(\d+)$/);
         playing = {
           url: r.url,
           resumeAt: resume,
@@ -121,9 +123,11 @@
           title: it.title,
           poster: it.poster || '',
           subtitleUrl:
-            it.type === 'movie' || it.type === 'tv'
-              ? `/api/subtitles/${it.type}/${it.tmdbId}`
-              : ''
+            it.type === 'movie'
+              ? `/api/subtitles/movie/${it.tmdbId}`
+              : it.type === 'tv' && ep
+                ? `/api/subtitles/tv/${it.tmdbId}?s=${ep[1]}&e=${ep[2]}`
+                : ''
         };
       } else if (r.embedUrl) {
         playing = { url: r.embedUrl, resumeAt: resume, type: 'iframe', title: it.title, poster: it.poster || '', subtitleUrl: '' };

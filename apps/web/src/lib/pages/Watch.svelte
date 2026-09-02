@@ -37,6 +37,14 @@
       : id
   );
 
+  // Episode-targeted subtitle path: OpenSubtitles needs season+episode for
+  // TV shows (series imdb id alone matches nothing).
+  const subtitlePath = $derived(
+    isTv && selectedSeason && selectedEpisode
+      ? `/api/subtitles/tv/${data.post.tmdbId}?s=${selectedSeason}&e=${selectedEpisode}`
+      : `/api/subtitles/${data.post.type}/${data.post.tmdbId}`
+  );
+
   function episodeLabel() {
     return isTv && selectedSeason && selectedEpisode
       ? ` — الموسم ${selectedSeason} الحلقة ${selectedEpisode}`
@@ -329,7 +337,7 @@
             strategy="direct"
             subtitleUrl={stream.type === 'iframe'
               ? ''
-              : `/api/subtitles/${data.post.type}/${data.post.tmdbId}`}
+              : subtitlePath}
             {resumeAt}
             onTimeUpdate={handleTimeUpdate}
             onError={handleStreamError}
@@ -410,7 +418,7 @@
         {#if stream && data.post.type && data.post.tmdbId}
           <a
             class="subtitle-download"
-            href={`/api/subtitles/${data.post.type}/${data.post.tmdbId}`}
+            href={subtitlePath}
             download="freewatch-arabic.vtt"
           >
             ⬇️ تحميل الترجمة العربية (ملف VTT)
@@ -419,7 +427,7 @@
             type="button"
             class="subtitle-download"
             onclick={() => {
-              const subUrl = `${location.origin}/api/subtitles/${data.post.type}/${data.post.tmdbId}`;
+              const subUrl = `${location.origin}${subtitlePath}`;
               navigator.clipboard?.writeText(subUrl);
               copiedSubUrl = true;
               setTimeout(() => (copiedSubUrl = false), 2500);
