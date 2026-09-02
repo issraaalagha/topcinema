@@ -227,20 +227,16 @@ export async function onRequest(context) {
   try {
     // ── TMDB/CineSrc path ──────────────────────────────────────────────────
     // Composite ids like "movie-969681" / "tv-94605-1-8" resolve via CineSrc.
+    // These titles always hand the source site's own player to the app
+    // (iframe embed): it is the experience users prefer for CineSrc and the
+    // service worker's ad-blocker strips its ads. The local extractor is
+    // reserved for the legacy topcinemaa server path below.
     const tmdbParsed = parseCompositeId(server || id);
     if (tmdbParsed) {
-      const embedUrl = cineSrcEmbedUrl(tmdbParsed);
-
-      const stream = await tryLocalExtractor(env, embedUrl, 'CineSrc');
-      if (stream) {
-        return proxiedResponse(embedUrl, stream, 'LocalExtractor (CineSrc)');
-      }
-
-      // No extractor available/failed → hand the embed to the player's iframe mode
       return jsonResponse({
         ok: false,
-        error: 'المستخرج المحلي غير متاح — سيتم التضمين المباشر',
-        embedUrl,
+        error: 'تضمين مباشر لمصدر CineSrc',
+        embedUrl: cineSrcEmbedUrl(tmdbParsed),
       }, 200);
     }
 
