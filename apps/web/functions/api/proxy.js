@@ -144,21 +144,80 @@ export async function onRequest(context) {
     if (val) resHeaders.set(h, val);
   }
 
-  // Ensure HTML5 video player compatible Content-Type for MP4 & TS video streams
-  if (!isM3u8) {
-    if (targetUrl.includes('.mp4') || !resHeaders.get('content-type') || resHeaders.get('content-type') === 'application/octet-stream') {
-      resHeaders.set('Content-Type', 'video/mp4');
-    } else if (targetUrl.includes('.ts')) {
-      resHeaders.set('Content-Type', 'video/mp2t');
+  // ── Content sniffing: some origins disguise playlists and segments as
+  // .jpg/.png (image/jpeg content-type). Peek the first bytes and detect an
+  // HLS playlist by content, not by extension — otherwise disguised child
+  // playlists pass through un-rewritten and relative segment URIs resolve
+  // against /api/proxy and hit the SPA shell.
+  const reader = upstreamResponse.body.getReader();
+  const firstRead = await reader.read();
+  const decoder = new TextDecoder();
+  const headText = firstRead.value ? decoder.decode(firstRead.value.slice(0, 7)) : '';
+  const looksLikePlaylist =
+    upstreamResponse.status === 200 && (isM3u8 || headText.startsWith('#EXTM3U'));
+
+  if (!looksLikePlaylist) {
+    // Binary passthrough (segments / init / mp4 / ts) with the first chunk
+    // re-attached so nothing is lost by the sniffing read.
+    if (firstRead.done) {
+      return new Response(null, { status: upstreamResponse.status, headers: resHeaders });
     }
+    if (!isM3u8) {
+      if (targetUrl.includes('.mp4') || !resHeaders.get('content-type') || resHeaders.get('content-type') === 'application/octet-stream') {
+        resHeaders.set('Content-Type', 'video/mp4');
+      } else if (targetUrl.includes('.ts')) {
+        resHeaders.set('Content-Type', 'video/mp2t');
+      }
+    }
+    const passthrough = new ReadableStream({
+      start(controller) {
+        controller.enqueue(firstRead.value);
+        const pump = () =>
+          reader.read().then(({ done, value }) => {
+            if (done) {
+              controller.close();
+              return;
+            }
+            controller.enqueue(value);
+            return pump();
+          });
+        return pump();
+      },
+      cancel() {
+        reader.cancel();
+      },
+    });
+    return new Response(passthrough, {
+      status: upstreamResponse.status,
+      headers: resHeaders,
+    });
   }
 
   // ── M3U8 Playlist Handling: Rewrite all relative and absolute URLs ────────
-  if (isM3u8) {
+  {
     resHeaders.set('Content-Type', 'application/vnd.apple.mpegurl');
     resHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
 
-    const rawText = await upstreamResponse.text();
+    const chunks = [];
+    let total = 0;
+    if (firstRead.value) {
+      chunks.push(firstRead.value);
+      total += firstRead.value.length;
+    }
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+      if (total > 2 * 1024 * 1024) break; // playlists are small; hard cap
+    }
+    const rawBytes = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks) {
+      rawBytes.set(c, off);
+      off += c.length;
+    }
+    const rawText = decoder.decode(rawBytes);
 
     if (!rawText.includes('#EXTM3U') && !rawText.includes('#EXT-X-')) {
       return targetError('Invalid HLS stream returned from upstream', 502);
@@ -206,10 +265,4 @@ export async function onRequest(context) {
       headers: resHeaders,
     });
   }
-
-  // ── Video Segments & MP4 Streams (Binary Passthrough with streaming) ─────
-  return new Response(upstreamResponse.body, {
-    status: upstreamResponse.status,
-    headers: resHeaders,
-  });
 }
