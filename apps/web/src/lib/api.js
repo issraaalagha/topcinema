@@ -170,6 +170,10 @@ export const api = {
     return request(`${BASE}/history${q}`, { method: 'DELETE' });
   },
 
+  // Cast permalink for the current title (single quality + audio group)
+  castLink: (cineId, q = '1080') =>
+    request(`${BASE}/cast-link?cine=${encodeURIComponent(cineId)}&q=${q}`),
+
   // Recommendations
   getRecommendations: (profile = myProfile()) => request(`${BASE}/recommendations?profile=${profile}`),
 };

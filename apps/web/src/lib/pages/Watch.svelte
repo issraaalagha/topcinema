@@ -18,6 +18,9 @@
   let failoverCount = $state(0);
   let copiedStream = $state(false);
   let copiedSubUrl = $state(false);
+  let castLinkCopied = $state('');
+  let castLinkUrl = $state('');
+  let castLinkErr = $state('');
   let selectedSeason = $state(null);
   let selectedEpisode = $state(null);
   let episodes = $state([]);
@@ -149,6 +152,38 @@
     }
     return data?.post?.defaultEmbed || '';
   }
+
+  async function copyCastLink(q = '1080') {
+    try {
+      const r = await api.castLink(effectiveId, q);
+      castLinkUrl = r.url;
+      castLinkErr = '';
+      navigator.clipboard?.writeText(r.url);
+      castLinkCopied = q;
+      setTimeout(() => (castLinkCopied = ''), 2500);
+      // Same-page request so cast apps sniffing network traffic (Web Video
+      // Cast) detect the combined stream automatically.
+      fetch(r.url, { mode: 'cors' }).catch(() => {});
+    } catch (e) {
+      castLinkErr = e.message || 'فشل توليد الرابط';
+      castLinkUrl = '';
+    }
+  }
+
+  // Auto-expose the cast permalink when an embed stream loads: cast apps
+  // sniffing the page's network requests will list it as a single stream
+  // (video + audio) without any manual copy/paste.
+  $effect(() => {
+    if (stream && stream.type === 'iframe' && effectiveId) {
+      api
+        .castLink(effectiveId, '1080')
+        .then((r) => {
+          castLinkUrl = r.url;
+          fetch(r.url, { mode: 'cors' }).catch(() => {});
+        })
+        .catch(() => {});
+    }
+  });
 
   async function pick(srv, isAutoFailover = false) {
     selectedServer = srv;
@@ -406,6 +441,30 @@
             {copiedStream ? '✅ تم نسخ رابط البث — الصقه في Web Video Caster أو VLC' : '🔗 نسخ رابط البث المباشر (للتشغيل في Web Video Caster / VLC / التلفاز)'}
           </button>
         {/if}
+        {#if stream && stream.type === 'iframe'}
+          <div class="cast-link-row">
+            <button
+              type="button"
+              class="subtitle-download"
+              onclick={() => copyCastLink('1080')}
+            >
+              {castLinkCopied === '1080' ? '✅ تم النسخ' : '🔗 رابط الكاست HD 1080p (صوت + فيديو معاً)'}
+            </button>
+            <button
+              type="button"
+              class="subtitle-download"
+              onclick={() => copyCastLink('2160')}
+            >
+              {castLinkCopied === '2160' ? '✅ تم النسخ' : '🔗 رابط الكاست 4K'}
+            </button>
+          </div>
+          {#if castLinkUrl}
+            <code class="cast-link-url">{castLinkUrl}</code>
+          {/if}
+          {#if castLinkErr}
+            <p class="cast-link-err">{castLinkErr}</p>
+          {/if}
+        {/if}
       </div>
     </div>
 
@@ -636,6 +695,32 @@
   .subtitle-download:hover {
     background: rgba(16, 185, 129, 0.22);
     transform: translateY(-1px);
+  }
+  .cast-link-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .cast-link-row .subtitle-download {
+    margin-top: 12px;
+  }
+  .cast-link-url {
+    display: block;
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm, 6px);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-2, #cbd5e1);
+    font-size: 11px;
+    word-break: break-all;
+    user-select: all;
+    direction: ltr;
+    text-align: left;
+  }
+  .cast-link-err {
+    margin-top: 8px;
+    color: #ff6b6b;
+    font-size: 12.5px;
   }
   .episodes-section {
     margin-top: 20px;
