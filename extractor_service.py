@@ -99,6 +99,58 @@ def validate_public_url(raw_url: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# HLS master-playlist filter: force one quality + keep audio group
+# (for cast apps that play a lone video rendition without sound)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def fetch_hls_master(master_url: str, referer: str) -> str:
+    res = requests.get(
+        master_url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Referer": referer,
+        },
+        timeout=30,
+    )
+    res.raise_for_status()
+    return res.text
+
+
+def filter_hls_master(raw: str, wanted_height: int) -> str:
+    """Return a master playlist containing only the audio renditions and the
+    single video variant closest to `wanted_height` (never above it unless
+    nothing at/below exists)."""
+    lines = raw.splitlines()
+    audio_lines = [l for l in lines if l.startswith("#EXT-X-MEDIA:")]
+
+    variants = []  # (height, inf_line, url_line)
+    pending_inf = None
+    for line in lines:
+        if line.startswith("#EXT-X-STREAM-INF:"):
+            pending_inf = line
+            continue
+        if pending_inf and line and not line.startswith("#"):
+            m = re.search(r"RESOLUTION=(\d+)x(\d+)", pending_inf)
+            height = int(m.group(2)) if m else 0
+            variants.append((height, pending_inf, line))
+            pending_inf = None
+    if not variants:
+        raise ValueError("no video variants found in master playlist")
+
+    def score(v):
+        h = v[0]
+        # exact/undershoot preferred; overshoot penalized heavily
+        return (abs(h - wanted_height) + (5000 if h > wanted_height else 0), -h)
+
+    best = min(variants, key=score)
+    out = ["#EXTM3U", "#EXT-X-VERSION:7"]
+    out.extend(audio_lines)
+    out.append(best[1])
+    out.append(best[2])
+    return "\n".join(out) + "\n"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Safe text-level deobfuscation (string substitution only, never executed)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -308,6 +360,34 @@ class Handler(BaseHTTPRequestHandler):
 
         if parsed.path == "/health":
             return self._send({"ok": True, "chromium": bool(ENGINE._browser)})
+
+        # /hls/<token>?url=<master.m3u8>&q=<height>&ref=<referer>
+        # Serves a filtered master playlist (one quality + audio group) for
+        # cast apps. Path token auth: cast apps cannot send headers.
+        if parsed.path.startswith("/hls/"):
+            path_token = parsed.path[len("/hls/"):]
+            if not hmac.compare_digest(path_token, TOKEN):
+                return self._send({"ok": False, "error": "unauthorized"}, 401)
+
+            query = urllib.parse.parse_qs(parsed.query)
+            master_url = (query.get("url") or [""])[0]
+            wanted = int((query.get("q") or ["1080"])[0])
+            referer = (query.get("ref") or ["https://cinesrc.st/"])[0]
+            if not master_url:
+                return self._send({"ok": False, "error": "missing url"}, 400)
+            try:
+                master_url = validate_public_url(master_url)
+                raw = fetch_hls_master(master_url, referer)
+                filtered = filter_hls_master(raw, wanted)
+            except (ValueError, requests.RequestException) as exc:
+                return self._send({"ok": False, "error": str(exc)}, 400)
+            body = filtered.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.apple.mpegurl")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
 
         if parsed.path != "/extract":
             return self._send({"ok": False, "error": "unknown endpoint"}, 404)
