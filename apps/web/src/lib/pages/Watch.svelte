@@ -37,6 +37,14 @@
       : id
   );
 
+  // Canonical cast id: home rows link as /watch/mixed-<id> — the cast-link
+  // API only accepts movie-/tv- composites, so build one from post metadata.
+  const cineId = $derived(
+    isTv && selectedSeason && selectedEpisode
+      ? `tv-${data.post.tmdbId}-${selectedSeason}-${selectedEpisode}`
+      : `${data.post.type === 'tv' ? 'tv' : 'movie'}-${data.post.tmdbId}`
+  );
+
   // Episode-targeted subtitle path: OpenSubtitles needs season+episode for
   // TV shows (series imdb id alone matches nothing).
   const subtitlePath = $derived(
@@ -163,7 +171,7 @@
 
   async function copyCastLink(q = '1080') {
     try {
-      const r = await api.castLink(effectiveId, q);
+      const r = await api.castLink(cineId, q);
       castLinkUrl = r.url;
       castLinkErr = '';
       navigator.clipboard?.writeText(r.url);
@@ -184,7 +192,7 @@
   $effect(() => {
     if (stream && stream.type === 'iframe' && effectiveId) {
       api
-        .castLink(effectiveId, '1080')
+        .castLink(cineId, '1080')
         .then((r) => {
           castLinkUrl = r.url;
           fetch(r.url, { mode: 'cors' }).catch(() => {});
