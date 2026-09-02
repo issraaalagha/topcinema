@@ -68,8 +68,9 @@ function json(data, status = 200) {
 
 async function captureMaster(browserBinding, embedUrl) {
   let stage = "launch";
+  let browser;
   try {
-    const browser = await puppeteer.launch(browserBinding);
+    browser = await puppeteer.launch(browserBinding);
     stage = "newPage";
     const page = await browser.newPage();
     stage = "request-listener";
@@ -94,7 +95,7 @@ async function captureMaster(browserBinding, embedUrl) {
     const msg = e && e.message ? e.message : String(e);
     throw new Error(`[stage=${stage}] ${msg}`);
   } finally {
-    await browser.close().catch(() => {});
+    if (browser) await browser.close().catch(() => {});
   }
 }
 
@@ -155,7 +156,7 @@ async function handle(request, env, ctx) {
 
   let filtered;
   try {
-    const master = await ctx.waitUntil(captureMaster(env.BROWSER, embedUrl));
+    const master = await captureMaster(env.BROWSER, embedUrl);
     const masterRes = await fetch(master, {
       headers: { Referer: "https://cinesrc.st/" },
     });
