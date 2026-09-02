@@ -1,8 +1,11 @@
 // Cast-link generator: returns a single public permalink (single quality +
 // audio group) for the current CineSrc title, for cast apps that cannot
 // send headers/cookies (Web Video Cast, TV players). Session required
-// (middleware default-deny); the extractor token is injected server-side
+// (middleware default-deny); the resolver token is injected server-side
 // and never reaches the client bundle.
+//
+// Fully cloud-based: points at the cinesrc-resolver Worker (Cloudflare
+// Browser Rendering on the edge) — the home PC is not involved at all.
 
 import { jsonResponse, CORS_HEADERS } from './_utils.js';
 import { getSession } from './_auth.js';
@@ -32,12 +35,12 @@ export async function onRequest(context) {
   if (!Q_ALLOW.has(q)) {
     return jsonResponse({ ok: false, error: 'جودة غير مدعومة' }, 400, 0);
   }
-  if (!env?.EXTRACTOR_URL || !env?.EXTRACTOR_TOKEN) {
+  if (!env?.CINESRC_RESOLVER_URL || !env?.CINE_HLS_TOKEN) {
     return jsonResponse({ ok: false, error: 'خدمة الكاست غير مهيأة' }, 503, 0);
   }
 
-  const base = String(env.EXTRACTOR_URL).replace(/\/$/, '');
-  const castUrl = `${base}/hls/${env.EXTRACTOR_TOKEN}?cine=${encodeURIComponent(cine)}&q=${q}&ref=${encodeURIComponent('https://cinesrc.st/')}`;
+  const base = String(env.CINESRC_RESOLVER_URL).replace(/\/$/, '');
+  const castUrl = `${base}/hls?cine=${encodeURIComponent(cine)}&q=${q}&token=${env.CINE_HLS_TOKEN}`;
 
   return jsonResponse({ ok: true, url: castUrl, q }, 200, 0);
 }
