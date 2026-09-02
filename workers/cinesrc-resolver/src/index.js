@@ -73,11 +73,25 @@ async function captureMaster(browserBinding, embedUrl) {
     browser = await puppeteer.launch(browserBinding);
     stage = "newPage";
     const page = await browser.newPage();
-    stage = "request-listener";
-    const masters = [];
-    page.on("request", (req) => {
-      const u = req.url();
-      if (/\.m3u8(\?|$)/i.test(u)) masters.push(u);
+    stage = "response-listener";
+    // Capture .m3u8 response BODIES from inside the browser context — the
+    // origin blocks direct datacenter fetches (418) but serves its own
+    // player's requests normally. The first responses may be child/audio
+    // playlists; the MASTER is the one containing #EXT-X-STREAM-INF.
+    const candidates = [];
+    let master = null;
+    page.on("response", async (res) => {
+      const u = res.url();
+      if (!/\.m3u8(\?|$)/i.test(u)) return;
+      try {
+        const text = await res.text();
+        if (!text || !text.includes("#EXTM3U")) return;
+        if (text.includes("#EXT-X-STREAM-INF")) {
+          if (!master) master = { url: u, body: text };
+        } else {
+          candidates.push({ url: u, body: text });
+        }
+      } catch {}
     });
     stage = "goto-cinesrc";
     await page.goto(embedUrl, {
@@ -85,12 +99,20 @@ async function captureMaster(browserBinding, embedUrl) {
       timeout: 30000,
     });
     stage = "wait-m3u8";
-    const deadline = Date.now() + 20000;
-    while (masters.length === 0 && Date.now() < deadline) {
+    const deadline = Date.now() + 25000;
+    while (!master && Date.now() < deadline) {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
     }
-    if (!masters.length) throw new Error("no master playlist captured");
-    return masters[0];
+    if (!master) {
+      const sample = candidates
+        .slice(0, 2)
+        .map((c) => c.url.slice(0, 80))
+        .join(" | ");
+      throw new Error(
+        `no master playlist captured (got ${candidates.length} child playlists${sample ? ": " + sample : ""})`,
+      );
+    }
+    return master;
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
     throw new Error(`[stage=${stage}] ${msg}`);
@@ -156,12 +178,8 @@ async function handle(request, env, ctx) {
 
   let filtered;
   try {
-    const master = await captureMaster(env.BROWSER, embedUrl);
-    const masterRes = await fetch(master, {
-      headers: { Referer: "https://cinesrc.st/" },
-    });
-    if (!masterRes.ok) throw new Error("master fetch failed with " + masterRes.status);
-    filtered = filterMaster(await masterRes.text(), parseInt(q, 10));
+    const captured = await captureMaster(env.BROWSER, embedUrl);
+    filtered = filterMaster(captured.body, parseInt(q, 10));
   } catch (e) {
     const detail = e && e.stack ? String(e.stack).slice(0, 400) : String(e);
     return json({ ok: false, error: detail }, 502);
