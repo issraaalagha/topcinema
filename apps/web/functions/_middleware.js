@@ -20,16 +20,20 @@ const PUBLIC_GET_PATHS = [
   /^\/api\/subtitles\/.+/,
 ];
 
-const UNAUTHORIZED = new Response(
-  JSON.stringify({ ok: false, error: 'غير مصرح — يرجى تسجيل الدخول' }),
-  {
-    status: 401,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'private, no-store',
-    },
-  }
-);
+// NOTE: never construct Responses at module top scope — the Workers runtime
+// disallows it in global scope; build them per-request inside the handler.
+function unauthorizedResponse() {
+  return new Response(
+    JSON.stringify({ ok: false, error: 'غير مصرح — يرجى تسجيل الدخول' }),
+    {
+      status: 401,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'private, no-store',
+      },
+    }
+  );
+}
 
 export async function onRequest(context) {
   const { request, next, env } = context;
@@ -68,5 +72,5 @@ export async function onRequest(context) {
     }
   }
 
-  return UNAUTHORIZED;
+  return unauthorizedResponse();
 }
