@@ -166,7 +166,7 @@
         },
       },
       ratio: '16:9',
-      autoplay: false,
+      autoplay: true,
       keyboard: { focused: true, global: true },
       tooltips: { controls: true, seek: true },
       captions: { active: true, language: 'ar', immediate: true },
