@@ -84,3 +84,9 @@ start_extractor.cmd
 
 # Local build scratch
 .fnbuild/
+
+# cloudflared binary (downloaded, never commit)
+tools/
+
+# launcher for tunnel+extractor (runs services; keep local)
+start_all.cmd
