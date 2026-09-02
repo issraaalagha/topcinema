@@ -9,12 +9,22 @@ export const CORS_HEADERS = {
   'Access-Control-Max-Age': '86400',
 };
 
-export function jsonResponse(data, status = 200, maxAge = 300) {
+/**
+ * JSON response helper.
+ * - Default: public catalog data → shared-cache friendly headers.
+ * - maxAge === 0 → `private, no-store` (admin/auth/dynamic endpoints).
+ * - opts.private → force `private, no-store` (per-user data, any maxAge).
+ */
+export function jsonResponse(data, status = 200, maxAge = 300, opts = {}) {
+  const cacheControl =
+    opts.private || maxAge === 0
+      ? 'private, no-store'
+      : `public, max-age=${maxAge}, s-maxage=${maxAge * 2}, stale-while-revalidate=${maxAge * 4}`;
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': `public, max-age=${maxAge}, s-maxage=${maxAge * 2}, stale-while-revalidate=${maxAge * 4}`,
+      'Cache-Control': cacheControl,
       ...CORS_HEADERS,
     },
   });

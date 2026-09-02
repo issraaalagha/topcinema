@@ -138,6 +138,6 @@ export async function onRequest(context) {
 
     return jsonResponse({ post, servers }, 200, 300);
   } catch (error) {
-    return jsonResponse({ error: 'تعذر تحميل التفاصيل', message: error.message }, 500);
+    return jsonResponse({ error: 'تعذر تحميل التفاصيل' }, 500, 0);
   }
 }

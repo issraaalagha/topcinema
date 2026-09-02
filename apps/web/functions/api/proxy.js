@@ -2,26 +2,62 @@
  * Cloudflare Edge Media & HLS Proxy
  * Enterprise-Grade Edge Proxy for M3U8 Playlists, TS Segments, and MP4 Video Streams.
  *
+ * Access control is enforced centrally in functions/_middleware.js: a valid
+ * session (cookie/Bearer) or a short-lived proxy-scoped media ticket (`mt`)
+ * is required before this handler runs — this endpoint is never public.
+ *
  * Features:
  * - Rewrites nested M3U8 playlists and TS chunks to route through Edge Proxy
  * - Spoofs upstream Referer and Origin to bypass CDN anti-hotlinking
  * - Forwards Range requests for seeking in MP4/TS streams (206 Partial Content)
- * - Full CORS headers (Access-Control-Allow-Origin: *)
+ * - Manual redirect following with per-hop re-validation (no blind fetches)
  * - Error resilient with status forwarding
  */
 
+const MAX_REDIRECTS = 4;
+
+function isPublicHttpsUrl(u) {
+  if (!u || u.protocol !== 'https:') return false;
+  const h = u.hostname;
+  if (!h || h.includes(':')) return false; // IPv6 literal
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false; // IPv4 literal
+  if (/(^|\.)(localhost|local|internal)$/.test(h)) return false;
+  return true;
+}
+
+/**
+ * Optional operator lock-down: when PROXY_ALLOWED_HOSTS is set (comma-separated
+ * domain suffixes), every target — including redirect hops — must match it.
+ */
+function isAllowedHost(hostname, env) {
+  const allowlist = env?.PROXY_ALLOWED_HOSTS;
+  if (!allowlist) return true;
+  return allowlist
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .some((suffix) => hostname === suffix || hostname.endsWith('.' + suffix));
+}
+
+function targetError(message, status) {
+  return new Response(message, {
+    status,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'private, no-store' },
+  });
+}
+
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
   const reqUrl = new URL(request.url);
   const targetUrl = reqUrl.searchParams.get('url');
   const customReferer = reqUrl.searchParams.get('ref');
+  const mediaTicket = reqUrl.searchParams.get('mt');
 
   const CORS_HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Range',
     'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
-    'Timing-Allow-Origin': '*',
   };
 
   // Handle CORS preflight
@@ -30,14 +66,18 @@ export async function onRequest(context) {
   }
 
   if (!targetUrl) {
-    return new Response('Missing URL parameter', { status: 400, headers: CORS_HEADERS });
+    return targetError('Missing URL parameter', 400);
   }
 
   let parsedTarget;
   try {
     parsedTarget = new URL(targetUrl);
   } catch {
-    return new Response('Invalid URL', { status: 400, headers: CORS_HEADERS });
+    return targetError('Invalid URL', 400);
+  }
+
+  if (!isPublicHttpsUrl(parsedTarget) || !isAllowedHost(parsedTarget.hostname, env)) {
+    return targetError('Blocked target', 403);
   }
 
   // Determine Referer and Origin
@@ -58,29 +98,38 @@ export async function onRequest(context) {
 
   let cleanTargetUrl = targetUrl.replace(/&asn=\d+/g, '');
 
+  // Manual redirect following: every hop is re-validated against the same
+  // scheme/host policy (OWASP SSRF prevention — no blind redirect fetches).
   let upstreamResponse;
   try {
-    upstreamResponse = await fetch(cleanTargetUrl, {
-      method: request.method === 'HEAD' ? 'HEAD' : 'GET',
-      headers: fetchHeaders,
-      redirect: 'follow',
-    });
+    let hopUrl = cleanTargetUrl;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      upstreamResponse = await fetch(hopUrl, {
+        method: request.method === 'HEAD' ? 'HEAD' : 'GET',
+        headers: fetchHeaders,
+        redirect: 'manual',
+      });
+      if (!upstreamResponse.ok || upstreamResponse.status < 300 || upstreamResponse.status > 308) break;
+      const location = upstreamResponse.headers.get('location');
+      if (!location) break;
+      let nextUrl;
+      try {
+        nextUrl = new URL(location, hopUrl);
+      } catch {
+        return targetError('Blocked redirect target', 403);
+      }
+      if (!isPublicHttpsUrl(nextUrl) || !isAllowedHost(nextUrl.hostname, env)) {
+        return targetError('Blocked redirect target', 403);
+      }
+      hopUrl = nextUrl.toString();
+    }
   } catch (err) {
-    return new Response(`Edge Proxy Fetch Error: ${err.message}`, {
-      status: 502,
-      headers: CORS_HEADERS,
-    });
+    return targetError('Edge Proxy Fetch Error', 502);
   }
 
   // If upstream failed and it's not a range error
   if (!upstreamResponse.ok && upstreamResponse.status !== 206 && upstreamResponse.status !== 304) {
-    return new Response(`Upstream error ${upstreamResponse.status}: ${upstreamResponse.statusText}`, {
-      status: upstreamResponse.status,
-      headers: {
-        ...CORS_HEADERS,
-        'Content-Type': 'text/plain',
-      },
-    });
+    return targetError(`Upstream error ${upstreamResponse.status}`, upstreamResponse.status);
   }
 
   const contentType = upstreamResponse.headers.get('content-type') || '';
@@ -112,14 +161,14 @@ export async function onRequest(context) {
     const rawText = await upstreamResponse.text();
 
     if (!rawText.includes('#EXTM3U') && !rawText.includes('#EXT-X-')) {
-      return new Response('Invalid HLS stream returned from upstream', {
-        status: 502,
-        headers: CORS_HEADERS,
-      });
+      return targetError('Invalid HLS stream returned from upstream', 502);
     }
 
     const baseUrl = new URL(targetUrl);
     const proxyRef = encodeURIComponent(referer);
+    // Ticketed sessions (cast receivers / native players) need the ticket on
+    // every child request, since rewritten URLs are fetched without cookies.
+    const ticketSuffix = mediaTicket ? `&mt=${encodeURIComponent(mediaTicket)}` : '';
 
     const lines = rawText.split('\n');
     const rewrittenLines = lines.map((line) => {
@@ -132,7 +181,7 @@ export async function onRequest(context) {
             try {
               absKeyUrl = new URL(uri, baseUrl).toString();
             } catch {}
-            return `URI="/api/proxy?url=${encodeURIComponent(absKeyUrl)}&ref=${proxyRef}"`;
+            return `URI="/api/proxy?url=${encodeURIComponent(absKeyUrl)}&ref=${proxyRef}${ticketSuffix}"`;
           });
         }
         return line;
@@ -149,7 +198,7 @@ export async function onRequest(context) {
       }
 
       // Route all sub-playlists and TS chunks through Edge Proxy
-      return `/api/proxy?url=${encodeURIComponent(absoluteUrl)}&ref=${proxyRef}`;
+      return `/api/proxy?url=${encodeURIComponent(absoluteUrl)}&ref=${proxyRef}${ticketSuffix}`;
     });
 
     return new Response(rewrittenLines.join('\n'), {

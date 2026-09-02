@@ -9,6 +9,7 @@ export async function onRequest(context) {
 
   const headers = new Headers({
     'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'private, no-store',
     'Set-Cookie': 'tc_auth=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax',
     ...CORS_HEADERS,
   });

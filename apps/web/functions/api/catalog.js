@@ -88,6 +88,7 @@ export async function onRequest(context) {
 
     return jsonResponse({ items, page, total_pages: Math.min(data.total_pages || 1, 500) }, 200, 300);
   } catch (error) {
-    return jsonResponse({ error: 'Failed to load catalog', message: error.message, items: [], page }, 500);
+    console.error('[catalog] internal error:', error);
+    return jsonResponse({ error: 'Failed to load catalog', items: [], page }, 500, 0);
   }
 }

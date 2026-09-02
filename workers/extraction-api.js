@@ -1,7 +1,39 @@
 /**
  * TopCinema Video Extraction API
  * Cloudflare Workers endpoint for direct video URL extraction
+ *
+ * Auth: every request must carry header `X-Extract-Key` equal to the
+ * EXTRACT_SHARED_SECRET binding (set via `wrangler secret put`). The worker
+ * fails closed — with no secret configured it serves nothing (503).
  */
+
+/** Length-checked, constant-time-ish comparison */
+function safeEqual(a, b) {
+  const aStr = String(a);
+  const bStr = String(b);
+  if (aStr.length !== bStr.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aStr.length; i++) diff |= aStr.charCodeAt(i) ^ bStr.charCodeAt(i);
+  return diff === 0;
+}
+
+function isAuthorized(request, env) {
+  const expected = env?.EXTRACT_SHARED_SECRET;
+  if (!expected) return false; // fail closed when the secret is not configured
+  return safeEqual((request.headers.get('X-Extract-Key') || '').trim(), expected);
+}
+
+// Only known video-host embeds may be fetched (SSRF/relay prevention).
+const EMBED_HOST_PATTERN = /(streamwish|mixdrop|lulustream|vidtube|cdn-video|filelions|earnvids|acek-cdn|updown|gamescdn|dood|streamtape|cinesrc)/i;
+
+function isAllowedEmbedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && EMBED_HOST_PATTERN.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
 
 // Server extraction patterns
 const SERVER_PATTERNS = {
@@ -109,10 +141,10 @@ const corsHeaders = {
 /**
  * Main request handler
  */
-async function handleRequest(request) {
+async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
-  
+
   // Handle OPTIONS
   if (request.method === 'OPTIONS') {
     return new Response(null, {
@@ -120,7 +152,23 @@ async function handleRequest(request) {
       headers: corsHeaders
     });
   }
-  
+
+  // Shared-secret gate on every API path (fail closed, 503 when unconfigured)
+  if (path.startsWith('/api/')) {
+    if (!env?.EXTRACT_SHARED_SECRET) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Service not configured' }),
+        { status: 503, headers: corsHeaders }
+      );
+    }
+    if (!isAuthorized(request, env)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: corsHeaders }
+      );
+    }
+  }
+
   try {
     // GET /api/servers/:movieId - Get all server URLs
     if (path.startsWith('/api/servers/')) {
@@ -155,14 +203,21 @@ async function handleRequest(request) {
     if (path === '/api/extract' && request.method === 'POST') {
       const data = await request.json();
       const { iframe_url, server_name } = data;
-      
+
       if (!iframe_url || !server_name) {
         return new Response(
           JSON.stringify({ success: false, error: 'Missing parameters' }),
           { status: 400, headers: corsHeaders }
         );
       }
-      
+
+      if (!isAllowedEmbedUrl(iframe_url)) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Embed host not allowed' }),
+          { status: 403, headers: corsHeaders }
+        );
+      }
+
       const videoUrl = await extractVideoUrl(iframe_url, server_name);
       
       if (videoUrl) {
@@ -253,14 +308,17 @@ async function handleRequest(request) {
     );
     
   } catch (error) {
+    console.error('Unhandled error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: 'Internal error' }),
       { status: 500, headers: corsHeaders }
     );
   }
 }
 
-// Cloudflare Workers entry point
-addEventListener('fetch', event => {
-  event.respondWith(handleRequest(event.request));
-});
+// Cloudflare Workers entry point (Modules format — required for secret bindings)
+export default {
+  async fetch(request, env) {
+    return handleRequest(request, env);
+  },
+};

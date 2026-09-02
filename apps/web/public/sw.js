@@ -71,12 +71,22 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // API: network-first, fallback cache
+  // API: only shared public catalog reads are cached (network-first). Every
+  // other API route — auth, favorites, history, recommendations, admin,
+  // resolve, media-ticket, proxy — is network-only: responses are per-user
+  // and/or credential-bearing, and Cache Storage ignores HTTP cache headers.
   if (url.pathname.startsWith('/api/')) {
+    const cacheableApi =
+      e.request.method === 'GET' &&
+      /^\/api\/(home|catalog|post|episodes)(\/|$)/.test(url.pathname);
+    if (!cacheableApi) {
+      e.respondWith(fetch(e.request));
+      return;
+    }
     e.respondWith(
       fetch(e.request)
         .then((res) => {
-          if (res.ok) {
+          if (res.ok && res.status === 200) {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put(e.request, copy));
           }

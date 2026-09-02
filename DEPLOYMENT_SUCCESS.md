@@ -167,7 +167,7 @@ wrangler pages deploy dist
 - **Build output directory:** `apps/web/dist`
 - **Environment variables:**
   - `PASSCODE_SECRET=***REDACTED***`
-  - `JWT_SECRET=***REDACTED-ROTATED-2026-09-02***`
+  - `JWT_SECRET=[REDACTED - rotated 2026-09-02]`
 
 ### 2. Configure D1 Database (Required for auth & favorites)
 ```bash

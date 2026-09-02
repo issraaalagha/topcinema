@@ -1,6 +1,6 @@
 <script>
   import { untrack } from 'svelte';
-  import { api } from '../api.js';
+  import { api, withMediaTicket } from '../api.js';
   import EnhancedPlayer from '../player/EnhancedPlayer.svelte';
   import { isInWatchlist, toggleWatchlist } from '../store.js';
 
@@ -164,9 +164,12 @@
       // otherwise fall back to the host's own embed player.
       if (r.ok && r.url) {
         console.log('[Watch] Resolved Stream URL:', r.url);
+        // Attach a short-lived proxy ticket so cast receivers and native
+        // players that send no cookies can still stream through /api/proxy.
+        const playableUrl = await withMediaTicket(r.url);
         stream = {
-          url: r.url,
-          copyUrl: new URL(r.url, location.origin).href,
+          url: playableUrl,
+          copyUrl: new URL(playableUrl, location.origin).href,
           type: r.type || (r.url.includes('.mp4') ? 'mp4' : 'hls'),
           server: srv.name
         };

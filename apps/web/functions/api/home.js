@@ -27,7 +27,7 @@ export async function onRequest(context) {
     return jsonResponse({ rows }, 200, 600);
   } catch (error) {
     return jsonResponse(
-      { error: 'Failed to load home feed', message: error.message, rows: [] },
+      { error: 'Failed to load home feed', rows: [] },
       500
     );
   }

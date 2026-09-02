@@ -8,14 +8,21 @@ direct .m3u8/.mp4 URLs from video hosts that block datacenter traffic.
 Result: the site plays video in its OWN player -> zero ads + Chromecast.
 
 Usage:
-    python extractor_service.py            # serves on http://localhost:8786
-    set EXTRACTOR_TOKEN=secret             # optional shared secret
+    set EXTRACTOR_TOKEN=secret            # REQUIRED shared bearer token
+    python extractor_service.py            # serves on http://127.0.0.1:8786
+
+The service fails closed: without EXTRACTOR_TOKEN it refuses to start, and
+every /extract call must send `Authorization: Bearer <token>` (the Cloudflare
+function sends it from its own EXTRACTOR_TOKEN secret). Bind address defaults
+to loopback — the cloudflared tunnel connector runs on the same host.
+Override with EXTRACTOR_HOST only if the tunnel runs elsewhere.
 
 Then expose it publicly (needed for the Cloudflare function to reach it):
-    cloudflared tunnel --url http://localhost:8786
+    cloudflared tunnel --url http://127.0.0.1:8786
     -> put the printed https URL into Pages env var EXTRACTOR_URL
 """
 
+import hmac
 import ipaddress
 import json
 import os
@@ -274,7 +281,12 @@ def extract_with_requests(page_url: str):
 # ─────────────────────────────────────────────────────────────────────────────
 
 ENGINE = BrowserEngine()
-TOKEN = urllib.parse.quote(os.environ.get("EXTRACTOR_TOKEN", ""))
+# Mandatory shared bearer token — the service refuses to start without one.
+TOKEN = (os.environ.get("EXTRACTOR_TOKEN") or "").strip()
+if not TOKEN:
+    print("❌ EXTRACTOR_TOKEN is required (set it before starting the service)")
+    raise SystemExit(1)
+HOST = os.environ.get("EXTRACTOR_HOST", "127.0.0.1")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -304,7 +316,9 @@ class Handler(BaseHTTPRequestHandler):
         page_url = (query.get("url") or [""])[0]
         server_name = (query.get("server") or ["unknown"])[0]
 
-        if TOKEN and (query.get("token") or [""])[0] != TOKEN:
+        # Bearer-token auth via header (constant-time compare)
+        auth_header = self.headers.get("Authorization") or ""
+        if not hmac.compare_digest(auth_header.strip(), f"Bearer {TOKEN}"):
             return self._send({"ok": False, "error": "unauthorized"}, 401)
 
         try:
@@ -331,6 +345,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(f"🚀 TopCinema extractor service on http://localhost:{PORT}")
+    print(f"🚀 TopCinema extractor service on http://{HOST}:{PORT}")
     print(f"   chromium: {'loading…' if PLAYWRIGHT_OK else 'NOT INSTALLED (pip install playwright)'}")
-    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+    ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

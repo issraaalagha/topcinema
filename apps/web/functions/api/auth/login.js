@@ -2,6 +2,7 @@ import { jsonResponse, CORS_HEADERS } from '../_utils.js';
 import {
   createSessionToken,
   getExpectedPasscode,
+  safeEqual,
   verifyPassword,
 } from '../_auth.js';
 
@@ -13,8 +14,17 @@ export async function onRequest(context) {
   }
 
   if (request.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+    return jsonResponse({ error: 'Method not allowed' }, 405, 0);
   }
+
+  // Fail closed: refuse to authenticate when the signing secrets are absent
+  if (!env?.JWT_SECRET || !env?.PASSCODE_SECRET) {
+    return jsonResponse({ ok: false, error: 'الخدمة غير مهيأة: أسرار المصادقة غير مضبوطة' }, 503, 0);
+  }
+
+  // Uniform failure response: identical message for unknown user, wrong
+  // password and wrong passcode (no account enumeration).
+  const loginFailed = () => jsonResponse({ ok: false, error: 'بيانات الدخول غير صحيحة' }, 401, 0);
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -23,7 +33,7 @@ export async function onRequest(context) {
     // ── Path 1: account login (username + password from D1) ──
     if (username && password) {
       if (!env?.DB) {
-        return jsonResponse({ ok: false, error: 'قاعدة البيانات غير متاحة' }, 503);
+        return jsonResponse({ ok: false, error: 'قاعدة البيانات غير متاحة' }, 503, 0);
       }
 
       const user = await env.DB
@@ -31,17 +41,13 @@ export async function onRequest(context) {
         .bind(String(username).trim().toLowerCase())
         .first();
 
-      if (!user || !user.active) {
-        return jsonResponse({ ok: false, error: 'الحساب غير موجود أو معطّل' }, 401);
-      }
-
-      const valid = await verifyPassword(password, user.salt, user.pass_hash);
+      const valid = user && user.active ? await verifyPassword(password, user.salt, user.pass_hash) : false;
       if (!valid) {
-        return jsonResponse({ ok: false, error: 'كلمة المرور غير صحيحة' }, 401);
+        return loginFailed();
       }
 
       const { token, maxAge } = await createSessionToken(
-        { sub: user.username, role: user.role },
+        { sub: user.username, role: user.role, ver: user.token_version || 0 },
         env,
         remember
       );
@@ -59,6 +65,7 @@ export async function onRequest(context) {
           status: 200,
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'private, no-store',
             'Set-Cookie': `tc_auth=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`,
             ...CORS_HEADERS,
           },
@@ -68,7 +75,7 @@ export async function onRequest(context) {
 
     // ── Path 2: master passcode (owner recovery / bootstrap) ──
     const expected = getExpectedPasscode(env);
-    if (passcode && String(passcode).trim() === String(expected).trim()) {
+    if (passcode && expected && safeEqual(String(passcode).trim(), String(expected).trim())) {
       const { token, maxAge } = await createSessionToken(
         { sub: 'owner', role: 'owner' },
         env,
@@ -88,6 +95,7 @@ export async function onRequest(context) {
           status: 200,
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'private, no-store',
             'Set-Cookie': `tc_auth=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`,
             ...CORS_HEADERS,
           },
@@ -95,8 +103,9 @@ export async function onRequest(context) {
       );
     }
 
-    return jsonResponse({ ok: false, error: 'بيانات الدخول غير صحيحة' }, 401);
+    return loginFailed();
   } catch (error) {
-    return jsonResponse({ ok: false, error: error.message }, 500);
+    console.error('[login] internal error:', error);
+    return jsonResponse({ ok: false, error: 'حدث خطأ داخلي، حاول لاحقاً' }, 500, 0);
   }
 }

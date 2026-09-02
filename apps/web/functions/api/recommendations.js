@@ -86,6 +86,7 @@ export async function onRequest(context) {
       .filter((i) => i.title && i.poster && !hasCJK(i.title))
       .slice(0, 15);
 
+    // Personalized → never publicly cacheable (SECURITY_AUDIT.md F-10)
     return jsonResponse(
       {
         ok: true,
@@ -94,9 +95,10 @@ export async function onRequest(context) {
         items,
       },
       200,
-      600
+      0,
+      { private: true }
     );
   } catch (error) {
-    return jsonResponse({ ok: false, items: [], error: error.message }, 500);
+    return jsonResponse({ ok: false, items: [], error: 'حدث خطأ داخلي، حاول لاحقاً' }, 500, 0);
   }
 }

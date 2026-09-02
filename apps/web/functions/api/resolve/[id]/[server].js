@@ -164,9 +164,14 @@ async function tryLocalExtractor(env, embedUrl, label) {
   if (!extractorBase) return null;
   try {
     const extractorUrl = `${extractorBase.replace(/\/$/, '')}/extract?url=${encodeURIComponent(embedUrl)}&server=${encodeURIComponent(label)}`;
+    // The extractor requires a shared bearer token (EXTRACTOR_TOKEN).
+    const token = env?.EXTRACTOR_TOKEN || '';
     const extRes = await fetch(extractorUrl, {
       signal: AbortSignal.timeout(70000),
-      headers: { 'User-Agent': 'topcinema-pages-function' },
+      headers: {
+        'User-Agent': 'topcinema-pages-function',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
     if (!extRes.ok) return null;
     const extData = await extRes.json();
@@ -312,7 +317,8 @@ export async function onRequest(context) {
     }, 200);
 
   } catch (error) {
-    return jsonResponse({ ok: false, error: error.message }, 500);
+    console.error('[resolve] internal error:', error);
+    return jsonResponse({ ok: false, error: 'حدث خطأ داخلي، حاول لاحقاً' }, 500, 0);
   }
 }
 

@@ -7,6 +7,7 @@ binding = "DB"
 database_name = "topcinema-db"
 database_id = "53062f22-fda2-4809-a561-27cc2864b91a"
 
-[vars]
-PASSCODE_SECRET = "***REDACTED***"
-JWT_SECRET = "***REDACTED-ROTATED-2026-09-02***"
+# Secrets (JWT_SECRET, PASSCODE_SECRET, EXTRACTOR_URL, EXTRACTOR_TOKEN) are
+# encrypted bindings — set via `wrangler pages secret put <NAME>` or the
+# dashboard. Never commit them here: [vars] is plaintext by design.
+# Local dev: copy .dev.vars.example to .dev.vars (gitignored).

@@ -49,3 +49,16 @@ CREATE TABLE IF NOT EXISTS user_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- 5. Auth Accounts (source of truth — the auth layer depends on this table;
+--    previously it existed only out-of-band, see SECURITY_AUDIT.md F-17)
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  pass_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'viewer', -- owner | admin | viewer
+  active INTEGER NOT NULL DEFAULT 1,
+  token_version INTEGER NOT NULL DEFAULT 0, -- bumped on password/role change to revoke sessions
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

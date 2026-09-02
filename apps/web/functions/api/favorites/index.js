@@ -40,11 +40,12 @@ export async function onRequest(context) {
 
   // Fallback memory state if DB binding is not present
   if (!db) {
-    return jsonResponse({
-      ok: true,
-      items: [],
-      warning: 'D1 binding not available, using client store fallback',
-    });
+    return jsonResponse(
+      { ok: true, items: [], warning: 'D1 binding not available, using client store fallback' },
+      200,
+      0,
+      { private: true }
+    );
   }
 
   try {
@@ -74,7 +75,8 @@ export async function onRequest(context) {
         added_at: row.created_at,
       }));
 
-      return jsonResponse({ ok: true, items, count: items.length });
+      // Per-user data: never publicly cacheable (SECURITY_AUDIT.md F-10)
+      return jsonResponse({ ok: true, items, count: items.length }, 200, 0, { private: true });
     }
 
     // 2. POST (Add to Favorites)
@@ -83,7 +85,7 @@ export async function onRequest(context) {
       const { id, title, poster = '', quality = '', imdb = '', genres = [], year = '' } = body;
 
       if (!id || !title) {
-        return jsonResponse({ ok: false, error: 'Missing item id or title' }, 400);
+        return jsonResponse({ ok: false, error: 'Missing item id or title' }, 400, 0);
       }
 
       const itemType = detectItemType(body);
@@ -106,7 +108,7 @@ export async function onRequest(context) {
         .bind(favId, profileId, String(id), itemType, title, poster, quality, imdb, genresStr, year)
         .run();
 
-      return jsonResponse({ ok: true, message: 'Added to favorites', item_type: itemType });
+      return jsonResponse({ ok: true, message: 'Added to favorites', item_type: itemType }, 200, 0);
     }
 
     // 3. DELETE (Remove from Favorites)
@@ -115,7 +117,7 @@ export async function onRequest(context) {
       if (!itemId) {
         // Clear all favorites for this profile
         await db.prepare('DELETE FROM favorites WHERE profile_id = ?').bind(profileId).run();
-        return jsonResponse({ ok: true, message: 'Favorites cleared' });
+        return jsonResponse({ ok: true, message: 'Favorites cleared' }, 200, 0);
       }
 
       await db
@@ -123,11 +125,12 @@ export async function onRequest(context) {
         .bind(profileId, String(itemId))
         .run();
 
-      return jsonResponse({ ok: true, message: 'Removed from favorites' });
+      return jsonResponse({ ok: true, message: 'Removed from favorites' }, 200, 0);
     }
 
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+    return jsonResponse({ error: 'Method not allowed' }, 405, 0);
   } catch (error) {
-    return jsonResponse({ ok: false, error: error.message }, 500);
+    console.error('[favorites] internal error:', error);
+    return jsonResponse({ ok: false, error: 'حدث خطأ داخلي، حاول لاحقاً' }, 500, 0);
   }
 }

@@ -28,6 +28,6 @@ export async function onRequest(context) {
 
     return jsonResponse({ season, episodes }, 200, 600);
   } catch (error) {
-    return jsonResponse({ error: 'تعذر تحميل الحلقات', message: error.message }, 500);
+    return jsonResponse({ error: 'تعذر تحميل الحلقات' }, 500, 0);
   }
 }

@@ -1,0 +1,11 @@
+# Copy to .dev.vars (gitignored) and fill with LOCAL DEV values only.
+# Production values go in encrypted bindings: `wrangler pages secret put <NAME>`
+JWT_SECRET=change-me-local-dev-secret
+PASSCODE_SECRET=change-me-local-passcode
+# Optional:
+# TMDB_API_KEY=
+# TMDB_READ_TOKEN=
+# OPENSUBTITLES_API_KEY=
+# EXTRACTOR_URL=
+# EXTRACTOR_TOKEN=
+# PROXY_ALLOWED_HOSTS=streamwish.to, mixdrop.co

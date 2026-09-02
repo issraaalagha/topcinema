@@ -106,6 +106,6 @@ export async function onRequest(context) {
       },
     });
   } catch (error) {
-    return jsonResponse({ error: error.message || 'فشل جلب الترجمة' }, 500);
+    return jsonResponse({ error: 'فشل جلب الترجمة' }, 500, 0);
   }
 }

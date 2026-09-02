@@ -87,6 +87,7 @@ export async function onRequest(context) {
 
     return jsonResponse({ error: 'Method not allowed' }, 405);
   } catch (error) {
-    return jsonResponse({ ok: false, error: error.message }, 500);
+    console.error('[admin/content] internal error:', error);
+    return jsonResponse({ ok: false, error: 'حدث خطأ داخلي، حاول لاحقاً' }, 500, 0);
   }
 }

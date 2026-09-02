@@ -10,10 +10,15 @@ export async function onRequest(context) {
 
   const session = await getSession(request, env);
 
-  return jsonResponse({
-    ok: true,
-    authenticated: !!session,
-    username: session?.sub || null,
-    role: session?.role || null,
-  });
+  // Auth-state responses must never be cached (per-user, F-10)
+  return jsonResponse(
+    {
+      ok: true,
+      authenticated: !!session,
+      username: session?.sub || null,
+      role: session?.role || null,
+    },
+    200,
+    0
+  );
 }

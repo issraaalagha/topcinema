@@ -24,11 +24,12 @@ export async function onRequest(context) {
   }
 
   if (!db) {
-    return jsonResponse({
-      ok: true,
-      items: [],
-      warning: 'D1 binding not available',
-    });
+    return jsonResponse(
+      { ok: true, items: [], warning: 'D1 binding not available' },
+      200,
+      0,
+      { private: true }
+    );
   }
 
   try {
@@ -52,7 +53,8 @@ export async function onRequest(context) {
         updated_at: row.updated_at,
       }));
 
-      return jsonResponse({ ok: true, items });
+      // Per-user data: never publicly cacheable (SECURITY_AUDIT.md F-10)
+      return jsonResponse({ ok: true, items }, 200, 0, { private: true });
     }
 
     // 2. POST (Save Progress)
@@ -61,7 +63,7 @@ export async function onRequest(context) {
       const { id, title, poster = '', quality = '', currentTime = 0, duration = 0 } = body;
 
       if (!id || !title) {
-        return jsonResponse({ ok: false, error: 'Missing id or title' }, 400);
+        return jsonResponse({ ok: false, error: 'Missing id or title' }, 400, 0);
       }
 
       const percent = duration > 0 ? Math.min(100, Math.round((currentTime / duration) * 100)) : 0;
@@ -73,7 +75,7 @@ export async function onRequest(context) {
           .prepare('DELETE FROM watch_history WHERE profile_id = ? AND item_id = ?')
           .bind(profileId, String(id))
           .run();
-        return jsonResponse({ ok: true, message: 'Watched and cleared' });
+        return jsonResponse({ ok: true, message: 'Watched and cleared' }, 200, 0);
       }
 
       await db
@@ -92,7 +94,7 @@ export async function onRequest(context) {
         .bind(historyId, profileId, String(id), title, poster, quality, currentTime, duration, percent)
         .run();
 
-      return jsonResponse({ ok: true, message: 'Saved progress' });
+      return jsonResponse({ ok: true, message: 'Saved progress' }, 200, 0);
     }
 
     // 3. DELETE (Remove specific item from history)
@@ -109,11 +111,12 @@ export async function onRequest(context) {
           .bind(profileId)
           .run();
       }
-      return jsonResponse({ ok: true, message: 'History cleared' });
+      return jsonResponse({ ok: true, message: 'History cleared' }, 200, 0);
     }
 
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+    return jsonResponse({ error: 'Method not allowed' }, 405, 0);
   } catch (error) {
-    return jsonResponse({ ok: false, error: error.message }, 500);
+    console.error('[history] internal error:', error);
+    return jsonResponse({ ok: false, error: 'حدث خطأ داخلي، حاول لاحقاً' }, 500, 0);
   }
 }

@@ -49,6 +49,6 @@ export async function onRequest(context) {
       0
     );
   } catch (error) {
-    return jsonResponse({ ok: false, error: error.message }, 500);
+    return jsonResponse({ ok: false, error: 'حدث خطأ داخلي، حاول لاحقاً' }, 500, 0);
   }
 }

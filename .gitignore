@@ -74,3 +74,10 @@ results_*.txt
 tmp/
 temp/
 *.tmp
+
+# Wrangler local dev secrets
+.dev.vars
+
+# Local secrets (never commit)
+start_extractor.cmd
+.secrets.tmp

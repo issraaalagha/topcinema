@@ -56,20 +56,21 @@ export async function onRequest(context) {
       if (!/^[a-z0-9_.-]{3,24}$/.test(username)) {
         return jsonResponse(
           { ok: false, error: 'اسم المستخدم: 3-24 حرفاً لاتينياً/أرقاماً فقط' },
-          400
+          400,
+          0
         );
       }
       if (password.length < 6) {
-        return jsonResponse({ ok: false, error: 'كلمة المرور: 6 أحرف على الأقل' }, 400);
+        return jsonResponse({ ok: false, error: 'كلمة المرور: 6 أحرف على الأقل' }, 400, 0);
       }
       // Only owner may mint admins
       if (role === 'admin' && !hasRole(session, 'owner')) {
-        return jsonResponse({ ok: false, error: 'إنشاء مشرفين للمالك فقط' }, 403);
+        return jsonResponse({ ok: false, error: 'إنشاء مشرفين للمالك فقط' }, 403, 0);
       }
 
       const exists = await db.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
       if (exists) {
-        return jsonResponse({ ok: false, error: 'اسم المستخدم محجوز' }, 409);
+        return jsonResponse({ ok: false, error: 'اسم المستخدم محجوز' }, 409, 0);
       }
 
       const salt = generateSalt();
@@ -83,7 +84,7 @@ export async function onRequest(context) {
         .bind(id, username, passHash, salt, role)
         .run();
 
-      return jsonResponse({ ok: true, id, username, role }, 200);
+      return jsonResponse({ ok: true, id, username, role }, 200, 0);
     }
 
     // ── UPDATE ────────────────────────────────────────────────────────────
@@ -93,53 +94,71 @@ export async function onRequest(context) {
         .prepare('SELECT id, username, role FROM users WHERE id = ?')
         .bind(String(body.id || ''))
         .first();
-      if (!target) return jsonResponse({ ok: false, error: 'الحساب غير موجود' }, 404);
+      if (!target) return jsonResponse({ ok: false, error: 'الحساب غير موجود' }, 404, 0);
 
-      // Role changes on owners require owner; viewers can't touch owners
-      if (target.role === 'owner' || body.role === 'owner') {
-        if (!hasRole(session, 'owner')) return unauthorized();
+      // Role-hierarchy integrity: mutating an admin row (role/password/active)
+      // or granting the admin role requires owner. Admins may only manage
+      // viewers. (Owner rows stay owner-only, as before.)
+      const touchesAdminRow = target.role === 'admin';
+      const grantsAdminRole = body.role === 'admin';
+      if (
+        target.role === 'owner' ||
+        body.role === 'owner' ||
+        ((touchesAdminRow || grantsAdminRole) && !hasRole(session, 'owner'))
+      ) {
+        return unauthorized();
       }
 
       if (body.active !== undefined) {
         // Can't deactivate yourself
         if (target.username === session.sub && body.active === 0) {
-          return jsonResponse({ ok: false, error: 'لا يمكنك تعطيل حسابك الحالي' }, 400);
+          return jsonResponse({ ok: false, error: 'لا يمكنك تعطيل حسابك الحالي' }, 400, 0);
         }
         await db.prepare('UPDATE users SET active = ? WHERE id = ?').bind(body.active ? 1 : 0, target.id).run();
       }
 
       if (body.role && ['viewer', 'admin'].includes(body.role)) {
-        await db.prepare('UPDATE users SET role = ? WHERE id = ?').bind(body.role, target.id).run();
+        // Bump token_version: role change revokes the target's live sessions
+        await db
+          .prepare('UPDATE users SET role = ?, token_version = token_version + 1 WHERE id = ?')
+          .bind(body.role, target.id)
+          .run();
       }
 
       if (body.password) {
         if (String(body.password).length < 6) {
-          return jsonResponse({ ok: false, error: 'كلمة المرور: 6 أحرف على الأقل' }, 400);
+          return jsonResponse({ ok: false, error: 'كلمة المرور: 6 أحرف على الأقل' }, 400, 0);
         }
         const salt = generateSalt();
         const passHash = await hashPassword(String(body.password), salt);
-        await db.prepare('UPDATE users SET pass_hash = ?, salt = ? WHERE id = ?').bind(passHash, salt, target.id).run();
+        // Bump token_version: password reset revokes the target's live sessions
+        await db
+          .prepare('UPDATE users SET pass_hash = ?, salt = ?, token_version = token_version + 1 WHERE id = ?')
+          .bind(passHash, salt, target.id)
+          .run();
       }
 
-      return jsonResponse({ ok: true });
+      return jsonResponse({ ok: true }, 200, 0);
     }
 
     // ── DELETE ────────────────────────────────────────────────────────────
     if (request.method === 'DELETE') {
       const id = url.searchParams.get('id') || '';
       const target = await db.prepare('SELECT username, role FROM users WHERE id = ?').bind(id).first();
-      if (!target) return jsonResponse({ ok: false, error: 'الحساب غير موجود' }, 404);
-      if (target.role === 'owner') return unauthorized();
+      if (!target) return jsonResponse({ ok: false, error: 'الحساب غير موجود' }, 404, 0);
+      // Hierarchy: admins may only delete viewers; admins/owners need owner.
+      if (target.role !== 'viewer' && !hasRole(session, 'owner')) return unauthorized();
       if (target.username === session.sub) {
-        return jsonResponse({ ok: false, error: 'لا يمكنك حذف حسابك الحالي' }, 400);
+        return jsonResponse({ ok: false, error: 'لا يمكنك حذف حسابك الحالي' }, 400, 0);
       }
 
       await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
-      return jsonResponse({ ok: true });
+      return jsonResponse({ ok: true }, 200, 0);
     }
 
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+    return jsonResponse({ error: 'Method not allowed' }, 405, 0);
   } catch (error) {
-    return jsonResponse({ ok: false, error: error.message }, 500);
+    console.error('[users] internal error:', error);
+    return jsonResponse({ ok: false, error: 'حدث خطأ داخلي، حاول لاحقاً' }, 500, 0);
   }
 }

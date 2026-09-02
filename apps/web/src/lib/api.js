@@ -38,6 +38,53 @@ async function request(url, options = {}) {
   return res.json();
 }
 
+// ── Media tickets ───────────────────────────────────────────────────────────
+// Short-lived proxy-scoped tickets so <video>/HLS/cast receivers that cannot
+// send Authorization headers can still stream through /api/proxy. Never a
+// session token — a leaked ticket dies within hours and grants proxy access
+// only. Cached client-side until shortly before expiry.
+let _mediaTicket = null; // { mt, exp }
+
+export async function withMediaTicket(url) {
+  if (!url || !url.startsWith('/api/proxy')) return url;
+  try {
+    if (!_mediaTicket || _mediaTicket.exp < Date.now() / 1000 + 60) {
+      const data = await request(`${BASE}/media-ticket`);
+      _mediaTicket = {
+        mt: data.mt,
+        exp: Math.floor(Date.now() / 1000) + (data.expiresIn || 0),
+      };
+    }
+    return `${url}${url.includes('?') ? '&' : '?'}mt=${encodeURIComponent(_mediaTicket.mt)}`;
+  } catch {
+    return url; // fall back to cookie-based auth for in-app playback
+  }
+}
+
+async function purgeApiCache() {
+  if (typeof caches === 'undefined') return;
+  try {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.map(async (key) => {
+        const cache = await caches.open(key);
+        const requests = await cache.keys();
+        await Promise.all(
+          requests
+            .filter((req) => {
+              try {
+                return new URL(req.url).pathname.startsWith('/api/');
+              } catch {
+                return false;
+              }
+            })
+            .map((req) => cache.delete(req))
+        );
+      })
+    );
+  } catch {}
+}
+
 export const api = {
   // Content & Feed
   home: () => request(`${BASE}/home`),
@@ -70,6 +117,9 @@ export const api = {
   verifyAuth: () => request(`${BASE}/auth/verify`),
   logout: async () => {
     setAuthToken(null);
+    // Purge any cached API responses tied to this account (SW caches do not
+    // expire on their own and ignore response cache headers).
+    await purgeApiCache();
     return request(`${BASE}/auth/logout`, { method: 'POST' }).catch(() => ({ ok: true }));
   },
 
