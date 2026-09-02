@@ -430,9 +430,12 @@ class Handler(BaseHTTPRequestHandler):
 
             query = urllib.parse.parse_qs(parsed.query)
             referer = (query.get("ref") or ["https://cinesrc.st/"])[0]
-            wanted = int((query.get("q") or ["1080"])[0])
             cine = (query.get("cine") or [""])[0]
             master_url = (query.get("url") or [""])[0]
+            try:
+                wanted = int((query.get("q") or ["1080"])[0])
+            except ValueError:
+                return self._send({"ok": False, "error": "invalid q"}, 400)
             try:
                 if cine:
                     filtered = get_filtered_master(cine, wanted, referer)
