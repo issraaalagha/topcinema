@@ -149,6 +149,10 @@ export async function onRequest(context) {
   // HLS playlist by content, not by extension — otherwise disguised child
   // playlists pass through un-rewritten and relative segment URIs resolve
   // against /api/proxy and hit the SPA shell.
+  if (!upstreamResponse.body) {
+    // HEAD (and 204/304) responses carry no body — nothing to sniff.
+    return new Response(null, { status: upstreamResponse.status, headers: resHeaders });
+  }
   const reader = upstreamResponse.body.getReader();
   const firstRead = await reader.read();
   const decoder = new TextDecoder();
@@ -209,7 +213,10 @@ export async function onRequest(context) {
       if (done) break;
       chunks.push(value);
       total += value.length;
-      if (total > 2 * 1024 * 1024) break; // playlists are small; hard cap
+      if (total > 2 * 1024 * 1024) {
+        reader.cancel(); // stop the upstream body; playlist exceeds hard cap
+        break;
+      }
     }
     const rawBytes = new Uint8Array(total);
     let off = 0;
