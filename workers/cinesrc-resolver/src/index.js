@@ -66,6 +66,90 @@ function json(data, status = 200) {
   });
 }
 
+// Minimal dark RTL player page. Loads the SAME url (fetch/XHR → m3u8) with
+// hls.js; Safari falls back to native HLS. Segments are CORS-open at the
+// origin (verified), so playback needs no proxy.
+function playerPage(url, cine, q) {
+  const qualityLabel = q === "2160" ? "4K" : q === "720" ? "720p" : "1080p HD";
+  const html = `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>مشغل البث — ${qualityLabel}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background:#0b0d12; color:#e5e7eb; font-family:system-ui,'Segoe UI',Tahoma,sans-serif;
+         min-height:100vh; display:flex; flex-direction:column; }
+  header { padding:12px 16px; display:flex; align-items:center; gap:10px;
+           background:rgba(255,255,255,.04); border-bottom:1px solid rgba(255,255,255,.08); }
+  .dot { width:8px; height:8px; border-radius:50%; background:#ef4444; }
+  header h1 { font-size:14px; font-weight:600; }
+  .badge { font-size:11px; background:rgba(16,185,129,.15); color:#10b981;
+           padding:2px 8px; border-radius:99px; }
+  main { flex:1; display:grid; place-items:center; padding:12px; }
+  video { width:100%; max-width:1100px; aspect-ratio:16/9; background:#000;
+          border-radius:12px; max-height:78vh; }
+  .status { margin-top:10px; font-size:13px; color:#9ca3af; text-align:center; min-height:20px; }
+  .err { color:#f87171; }
+  a.home { color:#10b981; text-decoration:none; font-size:12px; margin-inline-start:auto; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot"></span>
+  <h1>FreeWatch — بث مباشر</h1>
+  <span class="badge">${qualityLabel}</span>
+  <a class="home" href="https://freewatch.uk/">→ الموقع</a>
+</header>
+<main>
+  <div style="width:100%;max-width:1100px">
+    <video id="v" controls playsinline preload="auto"></video>
+    <div class="status" id="st">جارٍ تحميل البث…</div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
+<script>
+(function () {
+  var v = document.getElementById('v');
+  var st = document.getElementById('st');
+  var src = location.href.replace(/([?&])page=1&?/, '$1').replace(/[?&]$/, ''); // media URL
+  function fail(msg) { st.textContent = msg; st.className = 'status err'; }
+  // hls.js FIRST: MSE is reliable on Chromium/Firefox/Safari-desktop.
+  // Native HLS only as fallback (iOS Safari) — some webviews report
+  // canPlayType "maybe" yet fail to play (MEDIA_ERR_SRC_NOT_SUPPORTED).
+  if (window.Hls && Hls.isSupported()) {
+    var h = new Hls({ enableWorker: true });
+    h.loadSource(src);
+    h.attachMedia(v);
+    h.on(Hls.Events.MANIFEST_PARSED, function () {
+      st.textContent = 'البث جاهز — اضغط تشغيل';
+      v.play().catch(function () { st.textContent = 'البث جاهز — اضغط ▶ للتشغيل'; });
+    });
+    h.on(Hls.Events.FRAG_BUFFERED, function () { st.textContent = 'يشغّل الآن ▶'; });
+    h.on(Hls.Events.ERROR, function (e, d) {
+      if (d.fatal) fail('تعذر تشغيل البث: ' + d.details);
+    });
+  } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+    v.src = src; v.play().catch(function(){});
+    st.textContent = 'تشغيل مباشر (HLS أصلي)';
+  } else {
+    fail('المتصفح لا يدعم تشغيل HLS');
+  }
+})();
+</script>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
 async function captureMaster(browserBinding, embedUrl) {
   let stage = "launch";
   let browser;
@@ -164,6 +248,22 @@ async function handle(request, env, ctx) {
   const embedUrl = cinesrcEmbedFromComposite(cine);
   if (!embedUrl) {
     return json({ ok: false, error: "invalid cine id" }, 400);
+  }
+
+  // Content negotiation: a real browser NAVIGATION gets an embedded player
+  // page (the same URL plays in-browser); every other client — cast apps,
+  // TV players, fetch()/XHR sniffers — keeps receiving the raw m3u8.
+  // Sec-Fetch-Dest: document is only sent on top-level navigations, so
+  // Web Video Cast's network sniffer still sees the playlist. &page=1 is
+  // an explicit override for embedded webviews with non-standard headers.
+  const accept = request.headers.get("accept") || "";
+  const secDest = request.headers.get("sec-fetch-dest") || "";
+  const wantsPlayerPage =
+    url.searchParams.get("page") === "1" ||
+    secDest === "document" ||
+    (accept.includes("text/html") && !accept.includes("vnd.apple"));
+  if (wantsPlayerPage) {
+    return playerPage(url, cine, q);
   }
 
   // Edge cache: same query served from cache for 30 minutes (saves browser
