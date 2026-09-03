@@ -419,6 +419,112 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/health":
             return self._send({"ok": True, "chromium": bool(ENGINE._browser)})
 
+        # /hls/<token>/seg?url=<media-url> — referer-injecting media passthrough
+        # (lives under /hls so the existing Access bypass destination covers it)
+        # for hotlink-protected episodes (origin 404s requests without
+        # Referer: cinesrc.st; this residential-IP service is authorized).
+        # Playlists are re-served with segment URLs mapped back to /seg.
+        if parsed.path.startswith("/hls/") and parsed.path.endswith("/seg"):
+            path_token = parsed.path[len("/hls/"):-len("/seg")]
+            if not hmac.compare_digest(path_token, TOKEN):
+                return self._send({"ok": False, "error": "unauthorized"}, 401)
+            query = urllib.parse.parse_qs(parsed.query)
+            target = (query.get("url") or [""])[0]
+            if not target:
+                return self._send({"ok": False, "error": "missing url"}, 400)
+            try:
+                target = validate_public_url(target)
+            except ValueError as exc:
+                return self._send({"ok": False, "error": f"blocked: {exc}"}, 400)
+
+            headers = {
+                "User-Agent": USER_AGENT,
+                "Referer": "https://cinesrc.st/",
+                "Accept": "*/*",
+            }
+            range_header = self.headers.get("Range")
+            if range_header:
+                headers["Range"] = range_header
+            try:
+                upstream = requests.get(target, headers=headers, stream=True, timeout=(10, 60))
+            except requests.RequestException as exc:
+                return self._send({"ok": False, "error": f"upstream: {exc}"}, 502)
+
+            if upstream.status_code >= 400:
+                upstream.close()
+                return self._send(
+                    {"ok": False, "error": f"upstream {upstream.status_code}"},
+                    502,
+                )
+
+            content_type = upstream.headers.get("Content-Type", "")
+            if "mpegurl" in content_type.lower() or ".m3u8" in target.lower():
+                raw = upstream.text
+                upstream.close()
+                lines = []
+                for line in raw.splitlines():
+                    stripped = line.strip()
+                    if not stripped:
+                        lines.append(line)
+                        continue
+                    if stripped.startswith("#"):
+                        if stripped.startswith(("#EXT-X-KEY", "#EXT-X-MAP", "#EXT-X-MEDIA")):
+                            line = re.sub(
+                                r'URI="([^"]+)"',
+                                lambda m: 'URI="%s/seg/%s?url=%s"'
+                                % (
+                                    "http://127.0.0.1:%d" % PORT if HOST.startswith("127.") else "https://extractor.freewatch.uk",
+                                    TOKEN,
+                                    urllib.parse.quote(urllib.parse.urljoin(target, m.group(1)), safe=""),
+                                ),
+                                line,
+                            )
+                        lines.append(line)
+                        continue
+                    absolute = urllib.parse.urljoin(target, stripped)
+                    lines.append(
+                        "%s/seg/%s?url=%s"
+                        % (
+                            "http://127.0.0.1:%d" % PORT if HOST.startswith("127.") else "https://extractor.freewatch.uk",
+                            TOKEN,
+                            urllib.parse.quote(absolute, safe=""),
+                        )
+                    )
+                body = ("\n".join(lines) + "\n").encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.apple.mpegurl")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                return self.wfile.write(body)
+
+            # Binary passthrough (init/segments) with Range support.
+            # The origin disguises fMP4 segments as text/html — hls.js
+            # rejects media on that mime, so relabel disguised containers.
+            ct = content_type or "application/octet-stream"
+            if "html" in ct.lower() or "json" in ct.lower() or "plain" in ct.lower():
+                ct = "video/mp4"
+            self.send_response(upstream.status_code)
+            self.send_header("Content-Type", ct)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Accept-Ranges", "bytes")
+            length = upstream.headers.get("Content-Length")
+            if length:
+                self.send_header("Content-Length", length)
+            cr = upstream.headers.get("Content-Range")
+            if cr:
+                self.send_header("Content-Range", cr)
+            self.end_headers()
+            try:
+                for chunk in upstream.iter_content(chunk_size=64 * 1024):
+                    if chunk:
+                        self.wfile.write(chunk)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            finally:
+                upstream.close()
+            return
+
         # /hls/<token>?cine=tv-92783-1-1&q=1080   (permalink — resolves + filters)
         # /hls/<token>?url=<master.m3u8>&q=<height>&ref=<referer>  (direct)
         # Serves a filtered master playlist (one quality + audio group) for
